@@ -1,0 +1,143 @@
+[
+  {
+    "type": "constructor",
+    "inputs": [
+      {
+        "name": "_entryPoint",
+        "type": "address",
+        "internalType": "contract IEntryPoint"
+      }
+    ],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "accountImplementation",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "contract SimpleAccount"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "createAccount",
+    "inputs": [
+      {"name": "owner", "type": "address", "internalType": "address"},
+      {"name": "salt", "type": "uint256", "internalType": "uint256"}
+    ],
+    "outputs": [
+      {
+        "name": "ret",
+        "type": "address",
+        "internalType": "contract SimpleAccount"
+      }
+    ],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "createGuardianForAccount",
+    "inputs": [
+      {"name": "account", "type": "address", "internalType": "address"},
+      {"name": "salt", "type": "uint256", "internalType": "uint256"}
+    ],
+    "outputs": [{"name": "", "type": "address", "internalType": "address"}],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "getAddress",
+    "inputs": [
+      {"name": "owner", "type": "address", "internalType": "address"},
+      {"name": "salt", "type": "uint256", "internalType": "uint256"}
+    ],
+    "outputs": [{"name": "", "type": "address", "internalType": "address"}],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "getGuardianAddress",
+    "inputs": [
+      {"name": "account", "type": "address", "internalType": "address"},
+      {"name": "salt", "type": "uint256", "internalType": "uint256"}
+    ],
+    "outputs": [{"name": "", "type": "address", "internalType": "address"}],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "guardianOf",
+    "inputs": [{"name": "", "type": "address", "internalType": "address"}],
+    "outputs": [{"name": "", "type": "address", "internalType": "address"}],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "links",
+    "inputs": [{"name": "", "type": "uint256", "internalType": "uint256"}],
+    "outputs": [{"name": "", "type": "address", "internalType": "address"}],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "routers",
+    "inputs": [{"name": "", "type": "uint256", "internalType": "uint256"}],
+    "outputs": [{"name": "", "type": "address", "internalType": "address"}],
+    "stateMutability": "view"
+  },
+  {
+    "type": "event",
+    "name": "AccountCreated",
+    "inputs": [
+      {
+        "name": "chainid",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      },
+      {
+        "name": "router",
+        "type": "address",
+        "indexed": false,
+        "internalType": "address"
+      },
+      {
+        "name": "link",
+        "type": "address",
+        "indexed": false,
+        "internalType": "address"
+      },
+      {
+        "name": "account",
+        "type": "address",
+        "indexed": false,
+        "internalType": "address"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "GuardianCreated",
+    "inputs": [
+      {
+        "name": "account",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "guardian",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      }
+    ],
+    "anonymous": false
+  }
+]

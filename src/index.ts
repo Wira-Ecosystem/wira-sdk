@@ -1,12 +1,17 @@
 import NativeWiraProvider from './provider/NativeWiraSdk';
+import * as provision from './common/provisionClient';
+import { RegistryApi } from './register/registry';
+import idCardAnalyzer from './id-analyzer/idCardAnalyzer';
+import { Registerer } from './register';
+import { decryptVCWithPin } from './vcCrypto';
 /**
  * Mock function to simulate fetching app names from an API.
  */
 function getAppsNames() {
-  return ['com.firstapp', 'com.secondapp', 'com.thirdapp', 'com.fourthapp'];
+  return ['com.wirawallet', 'com.appelectoral'];
 }
 
-function signInWithWira(ownAppName: string) {
+function getWiraData(ownAppName: string) {
   //check local storage first
   let userData = getWiraDataFrom(ownAppName);
   if (userData) {
@@ -15,13 +20,22 @@ function signInWithWira(ownAppName: string) {
   }
 
   //check data on external apps
-  userData = getDataFromExternalApps();
+  userData = getDataFromExternalApps(ownAppName);
   if (userData) {
-    console.log('User data found on external app:', userData);
+    console.log('User data found on external app:');
     return userData;
   } else {
     console.log('No Wira data found in external apps. Registering needed...');
     return null;
+  }
+}
+
+async function signIn({ credential }: { credential: string }, pin: string) {
+  try {
+    return decryptVCWithPin(credential, pin);
+  } catch (error) {
+    console.error('Error decrypting VC with PIN:', error);
+    throw new Error('Invalid PIN');
   }
 }
 
@@ -30,8 +44,8 @@ function getUri(appName: string) {
   return `content://com.wira.${modifiedAppName}.provider/user/1`;
 }
 
-function getDataFromExternalApps() {
-  const apps = getAppsNames();
+function getDataFromExternalApps(ownAppName: string) {
+  const apps = getAppsNames().filter((app) => app !== ownAppName);
   let userData = null;
 
   for (const appName of apps) {
@@ -66,19 +80,13 @@ function getWiraDataFrom(appName: string) {
   }
 }
 
-function writeData(ownAppName: string, userData: Object) {
-  console.log('Saving Wira data...');
-  try {
-    const response = NativeWiraProvider.insertUser(
-      getUri(ownAppName),
-      userData
-    );
-    console.log('Wira response:', response);
-    return true;
-  } catch (error) {
-    console.error('Error saving Wira data:', error);
-    return false;
-  }
-}
-
-export { signInWithWira, writeData, NativeWiraProvider };
+const wira = {
+  getWiraData,
+  signIn,
+  NativeWiraProvider,
+  provision,
+  RegistryApi,
+  idCardAnalyzer,
+  Registerer,
+};
+export default wira;

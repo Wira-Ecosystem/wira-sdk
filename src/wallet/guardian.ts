@@ -1,5 +1,5 @@
 import { createPublicClient, http, type Hex } from 'viem';
-import factoryAbi from '../common/abi/SimpleAccountFactory.json' assert { type: 'json' };
+import factoryAbi from '../common/abi/SimpleAccountFactory.json' with { type: 'json' };
 import { availableNetworks, FACTORY_ADDRESS } from '../common/params';
 
 export async function getPredictedGuardian(

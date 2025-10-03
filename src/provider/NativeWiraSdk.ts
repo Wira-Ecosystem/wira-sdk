@@ -24,8 +24,6 @@ export interface Spec extends TurboModule {
   queryUser(uri: string): NativeCursor;
 
   updateUser(uri: string, values: NativeContentValues): number;
-
-  requestAccessDataPermission(): Promise<boolean>;
 }
 
 export default TurboModuleRegistry.getEnforcing<Spec>('WiraSdk');

@@ -1,7 +1,6 @@
 import axios from 'axios';
 import { Buffer } from 'buffer';
 import { getProvision } from '../common/provisionClient';
-import { CRED_TYPE, CRED_EXP_DAYS } from '@env';
 
 export type Claims = {
   fullName: string;
@@ -55,14 +54,19 @@ async function getGetPath(credentialId: string) {
   return joinPath(base, encodeURIComponent(credentialId));
 }
 
-export async function createCredential(subjectDid: string, claims: Claims) {
+export async function createCredential(
+  subjectDid: string,
+  claims: Claims,
+  credType: string,
+  credExpirationDays: string
+) {
   const expiration =
     Math.floor(Date.now() / 1000) +
-    parseInt(CRED_EXP_DAYS || '365', 10) * 86400;
+    parseInt(credExpirationDays || '365', 10) * 86400;
   const body = {
     credentialSchema:
       'https://ipfs.io/ipfs/QmeQhwtwP6XNG155M49yV6TFmm6s8er13WfeU7tcuM8eat',
-    type: CRED_TYPE,
+    type: credType,
     credentialSubject: { id: subjectDid, ...claims },
     expiration,
   };

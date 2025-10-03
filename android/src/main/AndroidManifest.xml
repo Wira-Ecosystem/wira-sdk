@@ -1,6 +1,2 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-  <permission android:name="wira.permission.ACCESS_DATA"
-      android:label="Read/write access to wira VC and wallet private key"
-      android:protectionLevel="dangerous"/>
-  <uses-permission android:name="wira.permission.ACCESS_DATA"/>
 </manifest>

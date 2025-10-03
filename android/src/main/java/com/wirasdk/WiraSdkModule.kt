@@ -9,20 +9,12 @@ import com.facebook.react.bridge.Arguments
 import com.facebook.react.bridge.ReadableMap
 import com.facebook.react.bridge.WritableMap
 import android.content.Context
-import com.facebook.react.bridge.Promise
-import androidx.core.app.ActivityCompat
-import androidx.core.content.ContextCompat
-import android.content.pm.PackageManager
-import android.util.Log
-
-//import com.wirasdk.*
 
 @ReactModule(name = WiraSdkModule.NAME)
 class WiraSdkModule(private val reactContext: ReactApplicationContext) :
   NativeWiraSdkSpec(reactContext) {
 
   private val contentProvider = reactContext.contentResolver
-  private var pendingPermissionPromise: Promise? = null
 
   override fun getName(): String {
     return NAME
@@ -97,35 +89,6 @@ class WiraSdkModule(private val reactContext: ReactApplicationContext) :
       }
     }
     return contentValues
-  }
-
-  override fun requestAccessDataPermission(promise: Promise) {
-    val permission = "wira.permission.ACCESS_DATA"
-    val activity = reactContext.currentActivity ?: run {
-      promise.reject("ERROR", "No current activity")
-      return
-    }
-
-    if (ContextCompat.checkSelfPermission(reactContext, permission) == PackageManager.PERMISSION_GRANTED) {
-      promise.resolve(true)  // Already granted
-    } else {
-      //pendingPermissionPromise = promise
-      ActivityCompat.requestPermissions(activity, arrayOf(permission), 1001)  // Request code 1001
-      promise.resolve(false)
-      // The result will be handled asynchronously in onRequestPermissionsResult
-    }
-  }
-
-  // Add this to handle the permission result asynchronously
-  fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
-    if (requestCode == 1001 && permissions.contains("wira.permission.ACCESS_DATA")) {
-      val granted = grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED
-      pendingPermissionPromise?.resolve(granted)
-      pendingPermissionPromise = null
-      Log.d("NativeWiraProvider", "Permission granted: $granted")
-    } else {
-      pendingPermissionPromise?.resolve(false)
-    }
   }
 
   companion object {

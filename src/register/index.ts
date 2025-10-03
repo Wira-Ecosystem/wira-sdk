@@ -1,7 +1,7 @@
 import { randomBytes } from '@noble/hashes/utils.js';
 import { createWalletOnChain, predictWalletAddress } from '../wallet';
 import type { availableNetworks } from '../common/params';
-import { bytesToHex } from 'viem';
+import { bytesToHex, type Hex } from 'viem';
 import { didFromEthAddress } from './did';
 import { createCredential, mapOcrToClaims, waitForVC } from './issuerClient';
 import { RegistryApi } from './registry';
@@ -24,13 +24,27 @@ export class Registerer {
   dni: string | null = null;
   vc: any = null;
   registryApi: RegistryApi;
+  bundler: string;
+  sponsorshipPolicyId: string;
 
-  constructor(registryUrl: string) {
+  constructor(
+    registryUrl: string,
+    bundler: string,
+    sponsorshipPolicyId: string
+  ) {
     this.registryApi = new RegistryApi(registryUrl);
+    this.bundler = bundler;
+    this.sponsorshipPolicyId = sponsorshipPolicyId;
   }
 
-  async createVC(chain: keyof typeof availableNetworks, ocrData: any) {
-    const privKey = bytesToHex(randomBytes(32));
+  async createVC(
+    chain: keyof typeof availableNetworks,
+    ocrData: any,
+    credType: string,
+    credExpirationDays: string,
+    ownerPk?: Hex
+  ) {
+    const privKey = ownerPk ?? bytesToHex(randomBytes(32));
     this.walletData = {
       ...(await predictWalletAddress(chain, privKey)),
       privateKey: privKey,
@@ -41,7 +55,9 @@ export class Registerer {
     const claims = mapOcrToClaims(ocrData);
     const { id: credentialId } = await createCredential(
       this.subjectDid,
-      claims
+      claims,
+      credType,
+      credExpirationDays
     );
     const vc = await waitForVC(credentialId);
     if (
@@ -68,7 +84,9 @@ export class Registerer {
       this.chain,
       this.walletData.salt,
       this.walletData.privateKey,
-      dni
+      dni,
+      this.bundler,
+      this.sponsorshipPolicyId
     );
 
     this.guardianAddress = response.guardianAddress;
@@ -92,6 +110,9 @@ export class Registerer {
       displayNamePublic: null,
       discoverableHashOptIn: true, // opt-in
       dni: this.dni,
+      ciphertext: 'example-ciphertext', //for recovery purposes
+      recoveryHash: 'example-recovery-hash', //for recovery purposes
+      dataToEncryptHash: 'example-data-to-encrypt-hash', //for recovery purposes
     });
   }
 
@@ -144,7 +165,6 @@ export class Registerer {
       const response = NativeWiraProvider.insertUser(this.getUri(appName), {
         credential: encryptedCredential,
       });
-      console.log('Wira response:', response);
       return response;
     } catch (error) {
       throw new Error('Error saving Wira data: ' + error);

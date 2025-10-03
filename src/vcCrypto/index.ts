@@ -9,7 +9,7 @@ import { scryptAsync } from '@noble/hashes/scrypt.js';
 
 // For higher security (slower):
 const highSecurityParams = {
-  N: 32768,
+  N: 2 ** 9,
   r: 8,
   p: 1,
   dkLen: 32,
@@ -25,9 +25,9 @@ export async function encryptVCWithPin(vcObj: Object, pin: string) {
 
   const plain = utf8ToBytes(JSON.stringify(vcObj));
   const cipher = aesGcmEncrypt(plain, derivedKey);
-  const payload = new Uint8Array(derivedKey.length + cipher.length);
-  payload.set(derivedKey, 0);
-  payload.set(cipher, derivedKey.length);
+  const payload = new Uint8Array(salt.length + cipher.length);
+  payload.set(salt, 0);
+  payload.set(cipher, salt.length);
   return hex(payload);
 }
 
@@ -41,5 +41,12 @@ export async function decryptVCWithPin(vcHex: string, pin: string) {
     highSecurityParams
   );
   const plain = aesGcmDecrypt(body, derivedKey);
-  return JSON.parse(new TextDecoder().decode(plain));
+  try {
+    return JSON.parse(new TextDecoder().decode(plain));
+  } catch (error: any) {
+    if (error.message.includes('JSON Parse error: Unexpected character')) {
+      throw new Error('Invalid PIN');
+    }
+    throw error;
+  }
 }

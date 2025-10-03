@@ -6,11 +6,7 @@ import {
   http,
   type Hex,
 } from 'viem';
-import {
-  availableNetworks,
-  FACTORY_ADDRESS,
-  sponsorshipPolicyId,
-} from '../common/params';
+import { availableNetworks, FACTORY_ADDRESS } from '../common/params';
 import { randomBytes, utf8ToBytes } from '@noble/hashes/utils.js';
 import { toSimpleSmartAccount } from 'permissionless/accounts';
 import { privateKeyToAccount } from 'viem/accounts';
@@ -18,7 +14,7 @@ import { entryPoint07Address } from 'viem/account-abstraction';
 import { createPimlicoClient } from 'permissionless/clients/pimlico';
 import { createSmartAccountClient } from 'permissionless';
 import { keccak_256 } from '@noble/hashes/sha3.js';
-import factoryAbi from '../common/abi/SimpleAccountFactory.json' assert { type: 'json' };
+import factoryAbi from '../common/abi/SimpleAccountFactory.json' with { type: 'json' };
 import { getPredictedGuardian } from './guardian';
 
 export async function predictWalletAddress(
@@ -53,6 +49,8 @@ export async function createWalletOnChain(
   salt: bigint,
   privateKey: Hex,
   dni: string,
+  bundler: string,
+  sponsorshipPolicyId: string,
   streamId = ''
 ) {
   try {
@@ -60,7 +58,7 @@ export async function createWalletOnChain(
       throw new Error(`Configuración no encontrada para chain: ${chainId}`);
     }
 
-    const { chain, bundler } = availableNetworks[chainId];
+    const { chain } = availableNetworks[chainId];
 
     const publicClient = createPublicClient({
       chain,

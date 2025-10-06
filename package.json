@@ -171,8 +171,11 @@
   },
   "dependencies": {
     "@google/genai": "^1.21.0",
+    "@lit-protocol/encryption": "^7.3.1",
+    "@lit-protocol/lit-node-client": "^7.3.1",
     "@noble/hashes": "^2.0.1",
     "@react-native-async-storage/async-storage": "^2.2.0",
+    "@walletconnect/modal": "^2.7.0",
     "axios": "^1.12.2",
     "bs58": "^6.0.0",
     "permissionless": "^0.2.57",

@@ -9,6 +9,8 @@ import NativeWiraProvider from '../provider/NativeWiraSdk';
 import { encryptVCWithPin } from '../vcCrypto';
 import * as Keychain from 'react-native-keychain';
 import { Platform } from 'react-native';
+import { EncryptionService } from '../encryption';
+import { getUri } from '../common/utils';
 
 export type WalletData = {
   address: `0x${string}`;
@@ -26,6 +28,8 @@ export class Registerer {
   registryApi: RegistryApi;
   bundler: string;
   sponsorshipPolicyId: string;
+  encryptService: EncryptionService;
+  encryptedCredential: string | null = null;
 
   constructor(
     registryUrl: string,
@@ -35,6 +39,7 @@ export class Registerer {
     this.registryApi = new RegistryApi(registryUrl);
     this.bundler = bundler;
     this.sponsorshipPolicyId = sponsorshipPolicyId;
+    this.encryptService = new EncryptionService();
   }
 
   async createVC(
@@ -93,34 +98,6 @@ export class Registerer {
     return response;
   }
 
-  async storeDataOnServer() {
-    if (!this.walletData || !this.subjectDid) {
-      throw new Error(
-        'Wallet data or subjectDid is not initialized, did you call createVC?'
-      );
-    }
-    if (!this.dni) {
-      throw new Error('DNI is not initialized, did you call createWallet?');
-    }
-
-    return this.registryApi.registryRegister({
-      did: this.subjectDid,
-      accountAddress: this.walletData.address,
-      guardianContractAddress: this.guardianAddress,
-      displayNamePublic: null,
-      discoverableHashOptIn: true, // opt-in
-      dni: this.dni,
-      ciphertext: 'example-ciphertext', //for recovery purposes
-      recoveryHash: 'example-recovery-hash', //for recovery purposes
-      dataToEncryptHash: 'example-data-to-encrypt-hash', //for recovery purposes
-    });
-  }
-
-  getUri(appName: string) {
-    const modifiedAppName = appName.replace(/^com\./, '');
-    return `content://com.wira.${modifiedAppName}.provider/user/1`;
-  }
-
   async storeOnDevice(appName: string, pin: string, useBiometry: boolean) {
     if (!this.vc) {
       throw new Error('VC is not initialized, did you call createVC?');
@@ -162,12 +139,48 @@ export class Registerer {
       }
 
       const encryptedCredential = await encryptVCWithPin(dataToEncrypt, pin);
-      const response = NativeWiraProvider.insertUser(this.getUri(appName), {
+      const response = NativeWiraProvider.insertUser(getUri(appName), {
         credential: encryptedCredential,
       });
+      this.encryptedCredential = encryptedCredential;
       return response;
     } catch (error) {
       throw new Error('Error saving Wira data: ' + error);
     }
+  }
+
+  async storeDataOnServer() {
+    if (!this.walletData || !this.subjectDid) {
+      throw new Error(
+        'Wallet data or subjectDid is not initialized, did you call createVC?'
+      );
+    }
+    if (!this.dni) {
+      throw new Error('DNI is not initialized, did you call createWallet?');
+    }
+    if (!this.encryptedCredential) {
+      throw new Error(
+        'No encrypted credential to store on server, did you call storeOnDevice?'
+      );
+    }
+
+    await this.encryptService.connect();
+    const encryptedData = await this.encryptService.encryptData({
+      credential: this.encryptedCredential,
+    });
+    this.encryptService.litNodeClient.disconnect();
+    console.log('Encrypted data to store on server:');
+    console.log(encryptedData);
+
+    return this.registryApi.registryRegister({
+      did: this.subjectDid,
+      accountAddress: this.walletData.address,
+      guardianContractAddress: this.guardianAddress,
+      displayNamePublic: null,
+      discoverableHashOptIn: true, // opt-in
+      dni: this.dni,
+      ciphertext: encryptedData.ciphertext,
+      dataToEncryptHash: encryptedData.dataToEncryptHash,
+    });
   }
 }

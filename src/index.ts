@@ -4,6 +4,9 @@ import { RegistryApi } from './register/registry';
 import idCardAnalyzer from './id-analyzer/idCardAnalyzer';
 import { Registerer } from './register';
 import { decryptVCWithPin } from './vcCrypto';
+import { EncryptionService } from './encryption';
+import { RecoveryService } from './recovery';
+
 /**
  * Mock function to simulate fetching app names from an API.
  */
@@ -88,5 +91,7 @@ const wira = {
   RegistryApi,
   idCardAnalyzer,
   Registerer,
+  EncryptionService,
+  RecoveryService,
 };
 export default wira;

@@ -9,7 +9,6 @@ export type RegistryInput = {
   discoverableHashOptIn: boolean; // opt-in
   dni: string;
   ciphertext: string; //for recovery purposes
-  recoveryHash: string; //for recovery purposes
   dataToEncryptHash: string; //for recovery purposes
 };
 
@@ -57,7 +56,6 @@ export class RegistryApi {
       guardianContractAddress: input.guardianContractAddress ?? null,
       displayNamePublic: input.displayNamePublic ?? null,
       ciphertext: input.ciphertext,
-      recoveryHash: input.recoveryHash,
       dataToEncryptHash: input.dataToEncryptHash,
     };
     if (input.discoverableHashOptIn && input.dni) {

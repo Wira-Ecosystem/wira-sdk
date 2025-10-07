@@ -58,7 +58,8 @@ if (typeof global.Event === 'undefined') {
 export class EncryptionService {
   litNodeClient;
   ethersWallet;
-  action = 'Qmcit12qGdPbbmAdXYQW7QwTv1zpx98JMeGqrxE9os6TGt';
+  ciAction = 'Qmcit12qGdPbbmAdXYQW7QwTv1zpx98JMeGqrxE9os6TGt';
+  guardianAction = 'QmaEnk58S7jfTrhJ46TAD77ebqEsAsukb1KhHMhKzmoxPi';
 
   // Example access control condition: only allow decryption if the user has signed a message with a specific IPFS ID
   accessControlConditions = [
@@ -70,7 +71,19 @@ export class EncryptionService {
       parameters: [':currentActionIpfsId'],
       returnValueTest: {
         comparator: '=',
-        value: this.action,
+        value: this.ciAction,
+      },
+    },
+    { operator: 'or' },
+    {
+      contractAddress: '',
+      standardContractType: '',
+      chain: 'ethereum',
+      method: '',
+      parameters: [':currentActionIpfsId'],
+      returnValueTest: {
+        comparator: '=',
+        value: this.guardianAction,
       },
     },
   ];
@@ -111,8 +124,8 @@ export class EncryptionService {
     );
   }
 
-  // Decrypt data
-  async decryptData(
+  // Decrypt data using CI images and CI number
+  async decryptDataWithCI(
     frontImg: string,
     backImg: string,
     selfieImg: string,
@@ -126,9 +139,35 @@ export class EncryptionService {
     }
 
     // Get session signatures from Lit nodes to let wallet use the Lit network
-    const sessionSigs = await this.litNodeClient.getSessionSigs({
+    const sessionSigs = await this.getSessionSigns();
+
+    // Execute the decryption on the Lit network
+    // The IPFS ID here should match the one in the access control condition
+    // In a real-world scenario, jsParams must include CI images, selfie, CI, and apiKey for validation
+    // Here we use a placeholder 'isValid' param for simplicity
+    const response = await this.litNodeClient.executeJs({
+      ipfsId: this.ciAction,
+      sessionSigs,
+      jsParams: {
+        accessControlConditions: this.accessControlConditions,
+        apiKey,
+        CI: discoverableHashFromDni(CI),
+        frontImg,
+        backImg,
+        selfieImg,
+      },
+    });
+
+    return response;
+  }
+
+  // Decrypt data using Guardian (not implemented yet)
+  async decryptDataWithGuardian() {}
+
+  async getSessionSigns() {
+    return this.litNodeClient.getSessionSigs({
       chain: 'ethereum',
-      expiration: new Date(Date.now() + 1000 * 60 * 10).toISOString(), // 10 minutes
+      expiration: new Date(Date.now() + 1000 * 60 * 5).toISOString(), // 5 minutes
       resourceAbilityRequests: [
         {
           resource: new LitActionResource('*'),
@@ -155,24 +194,5 @@ export class EncryptionService {
         });
       },
     });
-
-    // Execute the decryption on the Lit network
-    // The IPFS ID here should match the one in the access control condition
-    // In a real-world scenario, jsParams must include CI images, selfie, CI, and apiKey for validation
-    // Here we use a placeholder 'isValid' param for simplicity
-    const response = await this.litNodeClient.executeJs({
-      ipfsId: this.action,
-      sessionSigs,
-      jsParams: {
-        accessControlConditions: this.accessControlConditions,
-        apiKey,
-        CI: discoverableHashFromDni(CI),
-        frontImg,
-        backImg,
-        selfieImg,
-      },
-    });
-
-    return response;
   }
 }

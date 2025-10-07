@@ -1,8 +1,29 @@
+import { PermissionsAndroid, Platform } from 'react-native';
 import { getUri } from '../common/utils';
 import { EncryptionService } from '../encryption';
 import NativeWiraProvider from '../provider/NativeWiraSdk';
+import pako from 'pako';
+import {
+  check,
+  openSettings,
+  request,
+  RESULTS,
+} from 'react-native-permissions';
+import { Alert } from 'react-native';
+import { captureRef } from 'react-native-view-shot';
+import RNFS from 'react-native-fs';
+import RNQRGenerator from 'rn-qr-generator';
+import { encryptVCWithPin } from '../vcCrypto';
 
 export class RecoveryService {
+  async saveData(data: object, pin: string, appName: string) {
+    const encryptedCredential = await encryptVCWithPin(data, pin);
+    const response = NativeWiraProvider.insertUser(getUri(appName), {
+      credential: encryptedCredential,
+    });
+    return response;
+  }
+
   async recoveryAndSave(
     frontImage: any,
     backImage: any,
@@ -18,7 +39,7 @@ export class RecoveryService {
 
     await encryptionService.connect();
 
-    const encryptedData = await encryptionService.decryptData(
+    const encryptedData = await encryptionService.decryptDataWithCI(
       frontBase,
       backBase,
       selfieBase,
@@ -34,5 +55,107 @@ export class RecoveryService {
     NativeWiraProvider.insertUser(getUri(appName), data);
 
     return encryptedData;
+  }
+
+  prepareQrData(data: object) {
+    return Buffer.from(pako.deflate(JSON.stringify(data))).toString('base64');
+  }
+
+  decompressQrData(data: string) {
+    return JSON.parse(
+      pako.inflate(Buffer.from(data, 'base64'), { to: 'string' })
+    );
+  }
+
+  async requestGalleryPermission() {
+    if (Platform.OS !== 'android') return true;
+
+    let permission;
+
+    if (Platform.Version >= 33) {
+      // Android 13+ - Permisos específicos de media
+      permission = PermissionsAndroid.PERMISSIONS.READ_MEDIA_IMAGES;
+    } else {
+      // Android < 13 - Permiso tradicional
+      permission = PermissionsAndroid.PERMISSIONS.WRITE_EXTERNAL_STORAGE;
+    }
+
+    const status = await check(permission);
+    if (status === RESULTS.GRANTED) return true;
+
+    const granted = await request(permission, {
+      title: 'Permiso para galería',
+      message: 'Necesitamos acceso para guardar el QR en tu galería.',
+      buttonPositive: 'OK',
+    });
+
+    if (granted === RESULTS.GRANTED) return true;
+
+    if (granted === RESULTS.DENIED || granted === RESULTS.BLOCKED) {
+      Alert.alert(
+        'Permiso denegado',
+        'Para guardar en la galería, habilita el permiso en Configuración > Permisos',
+        [
+          { text: 'Abrir configuración', onPress: () => openSettings() },
+          { text: 'OK' },
+        ]
+      );
+    }
+    return false;
+  }
+
+  async saveToGallery(base64Data: string, fileName: string) {
+    const picturesDir = `${RNFS.ExternalStorageDirectoryPath}/Pictures`;
+    const path = `${picturesDir}/${fileName}`;
+
+    if (!(await RNFS.exists(picturesDir))) {
+      await RNFS.mkdir(picturesDir);
+    }
+    await RNFS.writeFile(path, base64Data, 'base64');
+    return path; // devuelve la ruta por si la necesitas
+  }
+
+  async saveQr(viewShotRef: React.RefObject<any>) {
+    const b64 = await captureRef(viewShotRef, {
+      format: 'png',
+      quality: 1,
+      result: 'base64',
+    });
+    const fileName = `QR_Recovery_${Date.now()}.png`;
+
+    try {
+      const path = await this.saveToGallery(b64, fileName);
+      return { savedOn: 'gallery', path, fileName };
+    } catch (galleryError) {
+      try {
+        const downloadPath = `${RNFS.DownloadDirectoryPath}/${fileName}`;
+        const path = await RNFS.writeFile(downloadPath, b64, 'base64');
+        return { savedOn: 'downloads', path, fileName };
+      } catch (downloadError) {
+        // Último recurso: directorio interno
+        const internalPath = `${RNFS.DocumentDirectoryPath}/${fileName}`;
+        const path = await RNFS.writeFile(internalPath, b64, 'base64');
+        return { savedOn: 'internal', path, fileName };
+      }
+    }
+  }
+
+  async recoveryFromQr(imageUri: string) {
+    const { values } = await RNQRGenerator.detect({ uri: imageUri });
+
+    if (!values?.length || !values[0]) {
+      throw new Error('No pude leer un QR válido');
+    }
+
+    const data = this.decompressQrData(values[0]);
+
+    const required = ['dni', 'salt', 'privKey', 'account', 'guardian', 'did'];
+
+    const missing = required.filter((f) => !data[f]);
+    if (missing.length) {
+      throw new Error(`Faltan campos: ${missing.join(', ')}`);
+    }
+
+    return data;
   }
 }

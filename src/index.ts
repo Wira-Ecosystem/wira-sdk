@@ -6,6 +6,9 @@ import { Registerer } from './register';
 import { decryptVCWithPin } from './vcCrypto';
 import { EncryptionService } from './encryption';
 import { RecoveryService } from './recovery';
+import { GuardiansApi } from './api/guardians';
+import ViewShot from 'react-native-view-shot';
+import { DeviceId } from './deviceId';
 
 /**
  * Mock function to simulate fetching app names from an API.
@@ -89,9 +92,12 @@ const wira = {
   NativeWiraProvider,
   provision,
   RegistryApi,
+  GuardiansApi,
   idCardAnalyzer,
   Registerer,
   EncryptionService,
   RecoveryService,
+  ViewShot,
+  DeviceId,
 };
 export default wira;

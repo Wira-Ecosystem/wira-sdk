@@ -10,6 +10,7 @@ import {
 } from '@lit-protocol/auth-helpers';
 import { discoverableHashFromDni } from '../register/idHash';
 import { getProvision } from '../common/provisionClient';
+import { jsonStringifyWithBigInt } from '../vcCrypto/json';
 
 // Polyfill for global document and Event in React Native
 if (typeof global.document === 'undefined') {
@@ -58,8 +59,8 @@ if (typeof global.Event === 'undefined') {
 export class EncryptionService {
   litNodeClient;
   ethersWallet;
-  ciAction = 'Qmcit12qGdPbbmAdXYQW7QwTv1zpx98JMeGqrxE9os6TGt';
-  guardianAction = 'QmaEnk58S7jfTrhJ46TAD77ebqEsAsukb1KhHMhKzmoxPi';
+  ciAction = 'QmXnkVgEuvz3JeWzxn8rbN5LS52goS9t1pnbfkqQvqdLe1';
+  guardianAction = 'QmX26mf2sUZunqjgkyXCqQ5aZqLVpso8UGgVL71MzBGxkm';
 
   // Example access control condition: only allow decryption if the user has signed a message with a specific IPFS ID
   accessControlConditions = [
@@ -117,7 +118,7 @@ export class EncryptionService {
   async encryptData(object: Object) {
     return encryptString(
       {
-        dataToEncrypt: JSON.stringify(object),
+        dataToEncrypt: jsonStringifyWithBigInt(object),
         accessControlConditions: this.accessControlConditions,
       },
       this.litNodeClient
@@ -141,10 +142,6 @@ export class EncryptionService {
     // Get session signatures from Lit nodes to let wallet use the Lit network
     const sessionSigs = await this.getSessionSigns();
 
-    // Execute the decryption on the Lit network
-    // The IPFS ID here should match the one in the access control condition
-    // In a real-world scenario, jsParams must include CI images, selfie, CI, and apiKey for validation
-    // Here we use a placeholder 'isValid' param for simplicity
     const response = await this.litNodeClient.executeJs({
       ipfsId: this.ciAction,
       sessionSigs,
@@ -162,7 +159,22 @@ export class EncryptionService {
   }
 
   // Decrypt data using Guardian (not implemented yet)
-  async decryptDataWithGuardian() {}
+  async decryptDataWithGuardian(dniHash: string, deviceId: string) {
+    // Get session signatures from Lit nodes to let wallet use the Lit network
+    const sessionSigs = await this.getSessionSigns();
+
+    const response = await this.litNodeClient.executeJs({
+      ipfsId: this.guardianAction,
+      sessionSigs,
+      jsParams: {
+        accessControlConditions: this.accessControlConditions,
+        dniHash,
+        deviceId,
+      },
+    });
+
+    return response;
+  }
 
   async getSessionSigns() {
     return this.litNodeClient.getSessionSigs({

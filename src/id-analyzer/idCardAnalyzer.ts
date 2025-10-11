@@ -152,13 +152,14 @@ Si el orden SÍ es correcto, responde SOLO este JSON (sin texto extra):
     } catch (e) {
       const loose = tryParseLooseJSON(text);
       if (loose) {
-        return { success: true, data: loose, raw: text };
+        data = loose;
+      } else {
+        return {
+          success: false,
+          error: 'La respuesta de la IA no es un JSON válido',
+          raw: text,
+        };
       }
-      return {
-        success: false,
-        error: 'La respuesta de la IA no es un JSON válido',
-        raw: text,
-      };
     }
 
     if (data?.error === 'front/back order') {

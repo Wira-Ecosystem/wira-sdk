@@ -47,8 +47,11 @@ abstract class AppDatabase : RoomDatabase() {
 
 //Database name
 const val DBNAME = "wira-db"
-// Define authority for ContentProvider (match with AndroidManifest.xml)
-const val AUTHORITY = "com.wira.sdk.provider"
+// Define authority for ContentProvider (to be set in AndroidManifest.xml by each app)
+// Example authorities:
+// - "com.wira.yourapp.provider" 
+// - "com.wira.exampleapp.provider"
+// - "com.wira.company.appname.provider"
 const val PATH_USER = "user"
 
 // URI matcher codes, db only have one user, so the ID always be 1
@@ -59,11 +62,15 @@ class WiraContentProvider : ContentProvider() {
     private var userDao: UserDao? = null
 
     companion object {
-        private val uriMatcher = UriMatcher(UriMatcher.NO_MATCH).apply {
-            // URI for accessing the single user (e.g., content://com.wira.sdk.provider/user/1)
-            // Only one user, always operate on the user with uid = 1
-            // or the first user found.
-            addURI(AUTHORITY, PATH_USER, USER_ONE)
+        
+        private fun getUriMatcher(uri: Uri): Int {
+            // Extract authority and path from the URI to determine the operation
+            val pathSegments = uri.pathSegments
+            return if (pathSegments.isNotEmpty() && pathSegments[0] == PATH_USER) {
+                USER_ONE
+            } else {
+                UriMatcher.NO_MATCH
+            }
         }
     }
 
@@ -72,37 +79,47 @@ class WiraContentProvider : ContentProvider() {
         selection: String?,
         selectionArgs: Array<out String?>?
     ): Int {
+        // Validate URI format
+        if (getUriMatcher(uri) != USER_ONE) {
+            Log.w("WiraContentProvider", "Invalid URI for delete operation: $uri")
+            return 0
+        }
+
         val userToDelete = userDao?.get()
 
         if (userToDelete == null) {
-            Log.w("NativeWiraProvider", "No user found to delete.")
+            Log.w("WiraContentProvider", "No user found to delete.")
             return 0 // No user to delete
         }
 
         return try {
-            // You might want to delete by ID if your DAO supports it and it's more direct
-            // val rowsAffected = userDao?.deleteById(1) ?: 0
             userDao?.delete(userToDelete)
             context?.contentResolver?.notifyChange(uri, null)
             return 1 // Unique row deleted
         } catch (e: Exception) {
-            Log.e("NativeWiraProvider", "Error deleting user: ${e.message}")
+            Log.e("WiraContentProvider", "Error deleting user: ${e.message}")
             0
         }
     }
 
     override fun getType(uri: Uri): String? {
         // For a single user, you can define a custom MIME type.
-        // Example: "vnd.android.cursor.item/vnd.com.wira.sdk.provider.user"
+        // Example: "vnd.android.cursor.item/vnd.com.yourapp.provider.user"
         // Or return null if you don't need to specify types.
-        return when (uriMatcher.match(uri)) {
-            USER_ONE -> "vnd.android.cursor.item/vnd.$AUTHORITY.$PATH_USER"
+        return when (getUriMatcher(uri)) {
+            USER_ONE -> "vnd.android.cursor.item/vnd.${uri.authority}.$PATH_USER"
             else -> null
         }
     }
 
     override fun insert(uri: Uri, values: ContentValues?): Uri? {
-        Log.w("NativeWiraProvider", "Inserting user")
+        // Validate URI format
+        if (getUriMatcher(uri) != USER_ONE) {
+            Log.w("WiraContentProvider", "Invalid URI for insert operation: $uri")
+            return null
+        }
+
+        Log.d("WiraContentProvider", "Inserting user")
         if (values == null) {
             throw IllegalArgumentException("ContentValues cannot be null")
         }
@@ -120,13 +137,16 @@ class WiraContentProvider : ContentProvider() {
             context?.contentResolver?.notifyChange(uri, null)
             return uri
         } catch (e: Exception) {
-            Log.e("NativeWiraProvider", "Error inserting user: ${e.message}")
+            Log.e("WiraContentProvider", "Error inserting user: ${e.message}")
             return null
         }
     }
 
     override fun onCreate(): Boolean {
         if(context == null) return false
+        
+        // The authority will be determined dynamically from the URI when methods are called
+        // For now, we'll use a default pattern that works with any authority
         appDatabase = Room.databaseBuilder(context!!, AppDatabase::class.java, DBNAME).build()
         userDao = appDatabase.userDao()
 
@@ -140,9 +160,16 @@ class WiraContentProvider : ContentProvider() {
         selectionArgs: Array<out String?>?,
         sortOrder: String?
     ): Cursor? {
+        // Validate URI format
+        if (getUriMatcher(uri) != USER_ONE) {
+            Log.w("WiraContentProvider", "Invalid URI for query operation: $uri")
+            return null
+        }
+
         val user = userDao?.get()
 
         if (user == null) {
+            Log.d("WiraContentProvider", "No user found for query")
             return null
         }
 
@@ -170,6 +197,12 @@ class WiraContentProvider : ContentProvider() {
         selection: String?,
         selectionArgs: Array<out String?>?
     ): Int {
+        // Validate URI format
+        if (getUriMatcher(uri) != USER_ONE) {
+            Log.w("WiraContentProvider", "Invalid URI for update operation: $uri")
+            return 0
+        }
+
         if (values == null) {
             return 0
         }
@@ -178,7 +211,7 @@ class WiraContentProvider : ContentProvider() {
         val existingUser = userDao?.get()
 
         if (existingUser == null) {
-            Log.w("NativeWiraProvider", "No user found to update.")
+            Log.w("WiraContentProvider", "No user found to update.")
             return 0 // No user to update
         }
 
@@ -190,7 +223,7 @@ class WiraContentProvider : ContentProvider() {
             context?.contentResolver?.notifyChange(uri, null)
             return 1 //Unique row affected
         } catch (e: Exception) {
-            Log.e("NativeWiraProvider", "Error updating user: ${e.message}")
+            Log.e("WiraContentProvider", "Error updating user: ${e.message}")
             0
         }
     }

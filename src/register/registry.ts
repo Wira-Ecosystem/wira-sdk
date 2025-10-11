@@ -73,4 +73,17 @@ export class RegistryApi {
     });
     return data;
   }
+
+  async updateRecoveryData(
+    dni: string,
+    ciphertext: string,
+    dataToEncryptHash: string
+  ) {
+    const { data } = await this.API.patch('/registry/recovery', {
+      discoverableHash: discoverableHashFromDni(dni),
+      ciphertext,
+      dataToEncryptHash,
+    });
+    return data;
+  }
 }

@@ -6,6 +6,7 @@ import {
 } from '@noble/hashes/utils.js';
 import { aesGcmEncrypt, aesGcmDecrypt } from './aesGcm';
 import { scryptAsync } from '@noble/hashes/scrypt.js';
+import { jsonStringifyWithBigInt } from './json';
 
 // For higher security (slower):
 const highSecurityParams = {
@@ -23,7 +24,10 @@ export async function encryptVCWithPin(vcObj: Object, pin: string) {
     highSecurityParams
   );
 
-  const plain = utf8ToBytes(JSON.stringify(vcObj));
+  // Custom JSON stringifier to handle BigInt values
+  const jsonString = jsonStringifyWithBigInt(vcObj);
+
+  const plain = utf8ToBytes(jsonString);
   const cipher = aesGcmEncrypt(plain, derivedKey);
   const payload = new Uint8Array(salt.length + cipher.length);
   payload.set(salt, 0);

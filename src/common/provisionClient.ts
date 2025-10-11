@@ -2,6 +2,7 @@ import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 import { STORAGE_KEY } from './constants';
+import { jsonStringifyWithBigInt } from '../vcCrypto/json';
 
 export type Provision = {
   mock?: boolean;
@@ -29,7 +30,7 @@ export async function fetchProvision({ mock = true, gatewayBase }: Provision) {
     timeout: 20000,
   });
   // data = { issuer: { adminBase, agentBase, createCredentialPath, ... }, gemini: {...} }
-  await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  await AsyncStorage.setItem(STORAGE_KEY, jsonStringifyWithBigInt(data));
   return data;
 }
 

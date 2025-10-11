@@ -30,7 +30,7 @@ export type TokenInput = {
 };
 
 export class GuardiansApi {
-  private API: AxiosInstance;
+  API: AxiosInstance;
 
   constructor(guardiansUrl: string) {
     this.API = axios.create({
@@ -62,7 +62,7 @@ export class GuardiansApi {
       };
     }
 
-    const { data: guardiansData } = await this.myGuardians(data.did);
+    const guardiansData = await this.myGuardians(data.did);
 
     if (!guardiansData?.ok) {
       return {
@@ -92,8 +92,8 @@ export class GuardiansApi {
     guardianDid: string,
     accept: 'accept' | 'reject'
   ) {
-    const response = await this.API.post(
-      `/guardians/invitations/${invitationId}/${accept}`,
+    const response = await this.API.patch(
+      `/guardians/invitation/${invitationId}/${accept}`,
       { guardianDid }
     );
     return response.data;
@@ -108,7 +108,7 @@ export class GuardiansApi {
   }
 
   async removeGuardian(invId: string, ownerDid: string) {
-    const response = await this.API.delete(`/guardians/remove/${invId}`, {
+    const response = await this.API.delete(`/guardians/${invId}`, {
       params: { ownerDid },
     });
     return response.data;

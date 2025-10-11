@@ -11,11 +11,22 @@ import * as Keychain from 'react-native-keychain';
 import { Platform } from 'react-native';
 import { EncryptionService } from '../encryption';
 import { getUri } from '../common/utils';
+import { jsonStringifyWithBigInt } from '../vcCrypto/json';
 
 export type WalletData = {
   address: `0x${string}`;
   salt: bigint;
   privateKey: `0x${string}`;
+};
+
+export type UserData = {
+  vc: string;
+  dni: string;
+  salt: bigint;
+  privKey: string;
+  account: string;
+  guardian: string | null;
+  did: string;
 };
 
 export class Registerer {
@@ -30,6 +41,7 @@ export class Registerer {
   sponsorshipPolicyId: string;
   encryptService: EncryptionService;
   encryptedCredential: string | null = null;
+  rawCredential: UserData | null = null;
 
   constructor(
     registryUrl: string,
@@ -111,7 +123,7 @@ export class Registerer {
       );
     }
 
-    const dataToEncrypt = {
+    this.rawCredential = {
       vc: this.vc,
       dni: this.dni,
       salt: this.walletData.salt,
@@ -125,7 +137,7 @@ export class Registerer {
       if (useBiometry) {
         await Keychain.setGenericPassword(
           'bundle',
-          JSON.stringify({ stored: dataToEncrypt }),
+          jsonStringifyWithBigInt({ stored: this.rawCredential }),
           {
             service: 'walletBundle',
             accessible: Keychain.ACCESSIBLE.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
@@ -138,11 +150,13 @@ export class Registerer {
         );
       }
 
-      const encryptedCredential = await encryptVCWithPin(dataToEncrypt, pin);
+      this.encryptedCredential = await encryptVCWithPin(
+        this.rawCredential,
+        pin
+      );
       const response = NativeWiraProvider.insertUser(getUri(appName), {
-        credential: encryptedCredential,
+        credential: this.encryptedCredential,
       });
-      this.encryptedCredential = encryptedCredential;
       return response;
     } catch (error) {
       throw new Error('Error saving Wira data: ' + error);
@@ -158,19 +172,18 @@ export class Registerer {
     if (!this.dni) {
       throw new Error('DNI is not initialized, did you call createWallet?');
     }
-    if (!this.encryptedCredential) {
+    if (!this.encryptedCredential || !this.rawCredential) {
       throw new Error(
-        'No encrypted credential to store on server, did you call storeOnDevice?'
+        'No credential to store on server, did you call storeOnDevice?'
       );
     }
 
     await this.encryptService.connect();
     const encryptedData = await this.encryptService.encryptData({
-      credential: this.encryptedCredential,
+      hashedData: this.encryptedCredential,
+      rawData: this.rawCredential,
     });
     this.encryptService.litNodeClient.disconnect();
-    console.log('Encrypted data to store on server:');
-    console.log(encryptedData);
 
     return this.registryApi.registryRegister({
       did: this.subjectDid,

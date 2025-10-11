@@ -14,6 +14,9 @@ import { captureRef } from 'react-native-view-shot';
 import RNFS from 'react-native-fs';
 import RNQRGenerator from 'rn-qr-generator';
 import { encryptVCWithPin } from '../vcCrypto';
+import { jsonStringifyWithBigInt } from '../vcCrypto/json';
+import { DeviceId } from '../deviceId';
+import { discoverableHashFromDni } from '../register/idHash';
 
 export class RecoveryService {
   async saveData(data: object, pin: string, appName: string) {
@@ -46,19 +49,28 @@ export class RecoveryService {
       dni
     );
     encryptionService.litNodeClient.disconnect();
+    console.log(encryptedData);
 
     if (!encryptedData.success) {
-      throw new Error('Decryption failed');
+      throw new Error('LIT Decryption failed');
     }
 
-    const data = JSON.parse(encryptedData.response as string);
-    NativeWiraProvider.insertUser(getUri(appName), data);
+    const response = JSON.parse(encryptedData.response as string);
+    if (!response.success) {
+      throw new Error('Data recovery failed: ' + response.error);
+    }
 
-    return encryptedData;
+    NativeWiraProvider.insertUser(getUri(appName), {
+      credential: response.data,
+    });
+
+    return response;
   }
 
   prepareQrData(data: object) {
-    return Buffer.from(pako.deflate(JSON.stringify(data))).toString('base64');
+    return Buffer.from(pako.deflate(jsonStringifyWithBigInt(data))).toString(
+      'base64'
+    );
   }
 
   decompressQrData(data: string) {
@@ -157,5 +169,41 @@ export class RecoveryService {
     }
 
     return data;
+  }
+
+  async recoveryFromGuardians(dni: string) {
+    const encryptionService = new EncryptionService();
+    await encryptionService.connect();
+
+    const deviceId = await DeviceId.getDeviceId();
+    const data = await encryptionService.decryptDataWithGuardian(
+      discoverableHashFromDni(dni),
+      deviceId
+    );
+    console.log(data);
+    encryptionService.litNodeClient.disconnect();
+
+    if (!data.success) {
+      throw new Error('Decryption failed');
+    }
+
+    const parsedData = JSON.parse(data.response as string);
+    if (!parsedData.success) {
+      throw new Error('Data recovery failed: ' + parsedData.error);
+    }
+
+    return parsedData.data;
+  }
+
+  async saveRecoveryDataFromGuardians(
+    data: object,
+    pin: string,
+    appName: string
+  ) {
+    const encryptedWithNewPin = await encryptVCWithPin(data, pin);
+    const response = NativeWiraProvider.insertUser(getUri(appName), {
+      credential: encryptedWithNewPin,
+    });
+    return response;
   }
 }

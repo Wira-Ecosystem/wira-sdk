@@ -1,14 +1,14 @@
-import { arbitrum, arbitrumSepolia } from 'viem/chains';
+import { base, baseSepolia } from 'viem/chains';
 
-export const FACTORY_ADDRESS = '0x74b3151e1df8f7bAdf2e0D32617C68B9C50a357E';
+export const FACTORY_ADDRESS = '0xf1A486Eaf648bC26d10eC60E8C4665BFB0d8947e';
 
 export const availableNetworks = {
-  'arbitrum-sepolia': {
-    chain: arbitrumSepolia,
-    explorer: 'https://sepolia.arbiscan.io/',
+  'base-sepolia': {
+    chain: baseSepolia,
+    explorer: 'https://sepolia.basescan.org/',
   },
-  'arbitrum': {
-    chain: arbitrum,
-    explorer: 'https://arbiscan.io/',
+  'base': {
+    chain: base,
+    explorer: 'https://basescan.org/',
   },
 };

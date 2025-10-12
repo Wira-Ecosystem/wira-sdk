@@ -4,6 +4,7 @@ import {
   createPublicClient,
   encodeFunctionData,
   http,
+  toHex,
   type Hex,
 } from 'viem';
 import { availableNetworks, FACTORY_ADDRESS } from '../common/params';
@@ -14,8 +15,6 @@ import { entryPoint07Address } from 'viem/account-abstraction';
 import { createPimlicoClient } from 'permissionless/clients/pimlico';
 import { createSmartAccountClient } from 'permissionless';
 import { keccak_256 } from '@noble/hashes/sha3.js';
-import factoryAbi from '../common/abi/SimpleAccountFactory.json' with { type: 'json' };
-import { getPredictedGuardian } from './guardian';
 
 export async function predictWalletAddress(
   chain: keyof typeof availableNetworks,
@@ -50,7 +49,6 @@ export async function createWalletOnChain(
   privateKey: Hex,
   dni: string,
   bundler: string,
-  sponsorshipPolicyId: string,
   streamId = ''
 ) {
   try {
@@ -62,7 +60,7 @@ export async function createWalletOnChain(
 
     const publicClient = createPublicClient({
       chain,
-      transport: http(),
+      transport: http(bundler),
     });
 
     const account = await toSimpleSmartAccount({
@@ -87,12 +85,6 @@ export async function createWalletOnChain(
       chain,
       bundlerTransport: http(bundler),
       paymaster: pimlicoClient,
-      paymasterContext: { sponsorshipPolicyId },
-      userOperation: {
-        estimateFeesPerGas: async () => {
-          return (await pimlicoClient.getUserOperationGasPrice()).standard;
-        },
-      },
     });
 
     const idHash = bytesToHex(hashIdentifier(dni, salt.toString()));
@@ -113,12 +105,6 @@ export async function createWalletOnChain(
       args: [idHash, streamId],
     });
 
-    const dataGuardian = encodeFunctionData({
-      abi: factoryAbi,
-      functionName: 'createGuardianForAccount',
-      args: [account.address, salt],
-    });
-
     const hash = await smartAccountClient.sendTransaction({
       calls: [
         {
@@ -126,24 +112,13 @@ export async function createWalletOnChain(
           value: BigInt(0),
           data,
         },
-        {
-          to: FACTORY_ADDRESS,
-          value: BigInt(0),
-          data: dataGuardian,
-        },
       ],
     });
     const guardianReceipt = await publicClient.waitForTransactionReceipt({
       hash,
     });
 
-    const guardianAddress = await getPredictedGuardian(
-      chainId,
-      account.address,
-      salt
-    );
-
-    return { guardianReceipt, guardianAddress };
+    return { guardianReceipt, guardianAddress: toHex('0x0') };
   } catch (error: any) {
     if (error.message.includes('instanceof')) {
       throw new Error(

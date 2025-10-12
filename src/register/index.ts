@@ -29,6 +29,9 @@ export type UserData = {
   did: string;
 };
 
+/**
+ * Class to make the wira user register
+ */
 export class Registerer {
   walletData: WalletData | null = null;
   chain: keyof typeof availableNetworks | null = null;
@@ -38,19 +41,18 @@ export class Registerer {
   vc: any = null;
   registryApi: RegistryApi;
   bundler: string;
-  sponsorshipPolicyId: string;
   encryptService: EncryptionService;
   encryptedCredential: string | null = null;
   rawCredential: UserData | null = null;
 
-  constructor(
-    registryUrl: string,
-    bundler: string,
-    sponsorshipPolicyId: string
-  ) {
+  /**
+   * Registerer constructor
+   * @param registryUrl the URL of the backend-identity provided
+   * @param bundler url of base paymaster url provided
+   */
+  constructor(registryUrl: string, bundler: string) {
     this.registryApi = new RegistryApi(registryUrl);
     this.bundler = bundler;
-    this.sponsorshipPolicyId = sponsorshipPolicyId;
     this.encryptService = new EncryptionService();
   }
 
@@ -102,8 +104,7 @@ export class Registerer {
       this.walletData.salt,
       this.walletData.privateKey,
       dni,
-      this.bundler,
-      this.sponsorshipPolicyId
+      this.bundler
     );
 
     this.guardianAddress = response.guardianAddress;

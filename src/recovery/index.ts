@@ -161,7 +161,7 @@ export class RecoveryService {
 
     const data = this.decompressQrData(values[0]);
 
-    const required = ['dni', 'salt', 'privKey', 'account', 'guardian', 'did'];
+    const required = ['dni', 'salt', 'privKey', 'account', 'did'];
 
     const missing = required.filter((f) => !data[f]);
     if (missing.length) {

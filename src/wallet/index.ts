@@ -60,7 +60,7 @@ export async function createWalletOnChain(
 
     const publicClient = createPublicClient({
       chain,
-      transport: http(bundler),
+      transport: http(),
     });
 
     const account = await toSimpleSmartAccount({

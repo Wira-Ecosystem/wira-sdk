@@ -18,10 +18,36 @@ import { jsonStringifyWithBigInt } from '../vcCrypto/json';
 import { DeviceId } from '../deviceId';
 import { discoverableHashFromDni } from '../register/idHash';
 import { getWiraDataFrom } from '../storage';
+import { RegistryApi } from '../register/registry';
 
 export class RecoveryService {
-  async saveData(data: object, pin: string, appName: string) {
+  async saveQrData(
+    data: any,
+    pin: string,
+    appName: string,
+    registryUrl: string
+  ) {
     const encryptedCredential = await encryptVCWithPin(data, pin);
+
+    const encryptService = new EncryptionService();
+    const registryApi = new RegistryApi(registryUrl);
+
+    await encryptService.connect();
+    const encryptedData = await encryptService.encryptData({
+      hashedData: encryptedCredential,
+      rawData: data,
+    });
+    encryptService.litNodeClient.disconnect();
+
+    const registerResponse = await registryApi.updateRecoveryData(
+      data.dni,
+      encryptedData.ciphertext,
+      encryptedData.dataToEncryptHash
+    );
+
+    if (!registerResponse.ok) {
+      throw new Error('Failed to update data on server');
+    }
 
     const userUri = getUri(appName);
     const previousData = getWiraDataFrom(appName);
@@ -136,6 +162,11 @@ export class RecoveryService {
       await RNFS.mkdir(picturesDir);
     }
     await RNFS.writeFile(path, base64Data, 'base64');
+    // Notify media scanner about the new file
+    if (Platform.OS === 'android') {
+      await RNFS.scanFile(path);
+    }
+
     return path; // devuelve la ruta por si la necesitas
   }
 

@@ -12,6 +12,7 @@ import { Platform } from 'react-native';
 import { EncryptionService } from '../encryption';
 import { getUri } from '../common/utils';
 import { jsonStringifyWithBigInt } from '../vcCrypto/json';
+import { getWiraDataFrom } from '../storage';
 
 export type WalletData = {
   address: `0x${string}`;
@@ -155,7 +156,15 @@ export class Registerer {
         this.rawCredential,
         pin
       );
-      const response = NativeWiraProvider.insertUser(getUri(appName), {
+
+      const userUri = getUri(appName);
+
+      const previousData = getWiraDataFrom(appName);
+      if (previousData) {
+        NativeWiraProvider.deleteUser(userUri);
+      }
+
+      const response = NativeWiraProvider.insertUser(userUri, {
         credential: this.encryptedCredential,
       });
       return response;

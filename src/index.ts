@@ -12,13 +12,7 @@ import { DeviceId } from './deviceId';
 import { Biometric } from './biometry';
 import * as Keychain from 'react-native-keychain';
 import { Platform } from 'react-native';
-
-/**
- * Mock function to simulate fetching app names from an API.
- */
-function getAppsNames() {
-  return ['com.wirawallet', 'com.appelectoral'];
-}
+import { getDataFromExternalApps, getUri, getWiraDataFrom } from './storage';
 
 /**
  * Get Wira user data from local storage or external apps.
@@ -73,62 +67,6 @@ async function checkPin(ownAppName: string, pin: string) {
     return true;
   } catch {
     return false;
-  }
-}
-
-/**
- * Get the content URI for a specific app.
- * @param appName - The package name of the app (e.g., 'com.wirawallet').
- * @returns The content URI for the app's user data.
- */
-function getUri(appName: string) {
-  const modifiedAppName = appName.replace(/^com\./, '');
-  return `content://com.wira.${modifiedAppName}.provider/user`;
-}
-
-/**
- * Get user data from external apps.
- * @param ownAppName - The package name of the current app (e.g., 'com.wirawallet').
- * @returns found user data or null if not found.
- */
-function getDataFromExternalApps(ownAppName: string) {
-  const apps = getAppsNames().filter((app) => app !== ownAppName);
-  let userData = null;
-
-  for (const appName of apps) {
-    const data = getWiraDataFrom(appName);
-    if (data) {
-      userData = data;
-      break;
-    }
-  }
-
-  return userData;
-}
-
-/**
- * Get Wira data from a specific app.
- * @param appName - The package name of the app (e.g., 'com.wirawallet').
- * @returns found user data or null if not found.
- */
-function getWiraDataFrom(appName: string) {
-  const uri = getUri(appName);
-  console.log('Checking Wira data in:', uri);
-
-  try {
-    const response = NativeWiraProvider.queryUser(uri);
-    return Object.keys(response).length > 0 ? response : null;
-  } catch (error: any) {
-    console.log(error);
-    if (
-      error.message.includes(
-        "The query result was empty, but expected a single row to return a NON-NULL object of type 'com.nativewiraprovider.User'"
-      )
-    ) {
-      return null; // No data found on own app, return null
-    }
-    console.error('Error checking Wira data:', error);
-    return null;
   }
 }
 

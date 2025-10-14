@@ -17,11 +17,18 @@ import { encryptVCWithPin } from '../vcCrypto';
 import { jsonStringifyWithBigInt } from '../vcCrypto/json';
 import { DeviceId } from '../deviceId';
 import { discoverableHashFromDni } from '../register/idHash';
+import { getWiraDataFrom } from '../storage';
 
 export class RecoveryService {
   async saveData(data: object, pin: string, appName: string) {
     const encryptedCredential = await encryptVCWithPin(data, pin);
-    const response = NativeWiraProvider.insertUser(getUri(appName), {
+
+    const userUri = getUri(appName);
+    const previousData = getWiraDataFrom(appName);
+    if (previousData) {
+      NativeWiraProvider.deleteUser(userUri);
+    }
+    const response = NativeWiraProvider.insertUser(userUri, {
       credential: encryptedCredential,
     });
     return response;
@@ -49,7 +56,6 @@ export class RecoveryService {
       dni
     );
     encryptionService.litNodeClient.disconnect();
-    console.log(encryptedData);
 
     if (!encryptedData.success) {
       throw new Error('LIT Decryption failed');
@@ -60,7 +66,13 @@ export class RecoveryService {
       throw new Error('Data recovery failed: ' + response.error);
     }
 
-    NativeWiraProvider.insertUser(getUri(appName), {
+    const userUri = getUri(appName);
+    const previousData = getWiraDataFrom(appName);
+    if (previousData) {
+      NativeWiraProvider.deleteUser(userUri);
+    }
+
+    NativeWiraProvider.insertUser(userUri, {
       credential: response.data,
     });
 
@@ -180,7 +192,6 @@ export class RecoveryService {
       discoverableHashFromDni(dni),
       deviceId
     );
-    console.log(data);
     encryptionService.litNodeClient.disconnect();
 
     if (!data.success) {
@@ -201,7 +212,12 @@ export class RecoveryService {
     appName: string
   ) {
     const encryptedWithNewPin = await encryptVCWithPin(data, pin);
-    const response = NativeWiraProvider.insertUser(getUri(appName), {
+    const userUri = getUri(appName);
+    const previousData = getWiraDataFrom(appName);
+    if (previousData) {
+      NativeWiraProvider.deleteUser(userUri);
+    }
+    const response = NativeWiraProvider.insertUser(appName, {
       credential: encryptedWithNewPin,
     });
     return response;

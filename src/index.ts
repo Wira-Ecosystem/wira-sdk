@@ -12,11 +12,16 @@ import { DeviceId } from './deviceId';
 import { Biometric } from './biometry';
 import * as Keychain from 'react-native-keychain';
 import { Platform } from 'react-native';
-import { getDataFromExternalApps, getUri, getWiraDataFrom } from './storage';
+import {
+  getDataFromExternalApps,
+  getUri,
+  getWiraDataFrom,
+  Storage,
+} from './storage';
 
 /**
  * Get Wira user data from local storage or external apps.
- * @param ownAppName - The package name of the current app (e.g., 'com.wirawallet').
+ * @param ownAppName - The package name of the current app (e.g., 'com.wirawallet').I
  * @returns found user data or null if not found.
  */
 function getWiraData(ownAppName: string) {
@@ -206,5 +211,6 @@ const wira = {
   ViewShot,
   DeviceId,
   Biometric,
+  Storage,
 };
 export default wira;

@@ -1,4 +1,6 @@
+import { Share } from 'react-native';
 import NativeWiraProvider from '../provider/NativeWiraSdk';
+import { jsonStringifyWithBigInt } from '../vcCrypto/json';
 
 /**
  * Mock function to simulate fetching app names from an API.
@@ -62,3 +64,28 @@ export function getWiraDataFrom(appName: string) {
     return null;
   }
 }
+
+async function shareData(appName: string) {
+  const data = getWiraDataFrom(appName);
+  if (!data) {
+    throw new Error('No data to share');
+  }
+  const jsonData = jsonStringifyWithBigInt(data);
+
+  try {
+    const result = await Share.share({
+      message: jsonData,
+      title: 'Compartir datos de Wira',
+    });
+
+    if (result.action === Share.dismissedAction) {
+      console.log('Share dismissed');
+    }
+  } catch (error) {
+    console.error('Error sharing:', error);
+  }
+}
+
+export const Storage = {
+  shareData,
+};

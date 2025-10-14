@@ -7,7 +7,6 @@ import { decryptVCWithPin, encryptVCWithPin } from './vcCrypto';
 import { EncryptionService } from './encryption';
 import { RecoveryService } from './recovery';
 import { GuardiansApi } from './api/guardians';
-import ViewShot from 'react-native-view-shot';
 import { DeviceId } from './deviceId';
 import { Biometric } from './biometry';
 import * as Keychain from 'react-native-keychain';
@@ -208,7 +207,6 @@ const wira = {
   Registerer,
   EncryptionService,
   RecoveryService,
-  ViewShot,
   DeviceId,
   Biometric,
   Storage,

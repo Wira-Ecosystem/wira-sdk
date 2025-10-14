@@ -10,7 +10,6 @@ import {
   RESULTS,
 } from 'react-native-permissions';
 import { Alert } from 'react-native';
-import { captureRef } from 'react-native-view-shot';
 import RNFS from 'react-native-fs';
 import RNQRGenerator from 'rn-qr-generator';
 import { encryptVCWithPin } from '../vcCrypto';
@@ -170,26 +169,21 @@ export class RecoveryService {
     return path; // devuelve la ruta por si la necesitas
   }
 
-  async saveQr(viewShotRef: React.RefObject<any>) {
-    const b64 = await captureRef(viewShotRef, {
-      format: 'png',
-      quality: 1,
-      result: 'base64',
-    });
+  async saveQrOnDevice(b64Data: string) {
     const fileName = `QR_Recovery_${Date.now()}.png`;
 
     try {
-      const path = await this.saveToGallery(b64, fileName);
+      const path = await this.saveToGallery(b64Data, fileName);
       return { savedOn: 'gallery', path, fileName };
     } catch (galleryError) {
       try {
         const downloadPath = `${RNFS.DownloadDirectoryPath}/${fileName}`;
-        const path = await RNFS.writeFile(downloadPath, b64, 'base64');
+        const path = await RNFS.writeFile(downloadPath, b64Data, 'base64');
         return { savedOn: 'downloads', path, fileName };
       } catch (downloadError) {
         // Último recurso: directorio interno
         const internalPath = `${RNFS.DocumentDirectoryPath}/${fileName}`;
-        const path = await RNFS.writeFile(internalPath, b64, 'base64');
+        const path = await RNFS.writeFile(internalPath, b64Data, 'base64');
         return { savedOn: 'internal', path, fileName };
       }
     }

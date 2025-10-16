@@ -242,7 +242,7 @@ export class RecoveryService {
     if (previousData) {
       NativeWiraProvider.deleteUser(userUri);
     }
-    const response = NativeWiraProvider.insertUser(appName, {
+    const response = NativeWiraProvider.insertUser(userUri, {
       credential: encryptedWithNewPin,
     });
     return response;

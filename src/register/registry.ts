@@ -47,6 +47,13 @@ export class RegistryApi {
     return { ...data, discoverableHash };
   }
 
+  async resolveByDid(did: string) {
+    const { data } = await this.API.get('/registry/by-did', {
+      params: { did },
+    });
+    return data;
+  }
+
   async registryRegister(input: RegistryInput) {
     const payload: Omit<RegistryInput, 'discoverableHashOptIn' | 'dni'> & {
       discoverableHash?: string;

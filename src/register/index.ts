@@ -45,16 +45,23 @@ export class Registerer {
   encryptService: EncryptionService;
   encryptedCredential: string | null = null;
   rawCredential: UserData | null = null;
+  arbitrumSponsorshipPolicyId: string | undefined = undefined;
 
   /**
    * Registerer constructor
    * @param registryUrl the URL of the backend-identity provided
    * @param bundler url of base paymaster url provided
+   * @param arbitrumSponsorshipPolicyId optional sponsorship policy id for arbitrum networks
    */
-  constructor(registryUrl: string, bundler: string) {
+  constructor(
+    registryUrl: string,
+    bundler: string,
+    arbitrumSponsorshipPolicyId?: string
+  ) {
     this.registryApi = new RegistryApi(registryUrl);
     this.bundler = bundler;
     this.encryptService = new EncryptionService();
+    this.arbitrumSponsorshipPolicyId = arbitrumSponsorshipPolicyId;
   }
 
   async createVC(
@@ -105,7 +112,9 @@ export class Registerer {
       this.walletData.salt,
       this.walletData.privateKey,
       dni,
-      this.bundler
+      this.bundler,
+      '',
+      this.arbitrumSponsorshipPolicyId
     );
 
     this.guardianAddress = response.guardianAddress;

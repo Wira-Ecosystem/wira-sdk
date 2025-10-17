@@ -49,7 +49,8 @@ export async function createWalletOnChain(
   privateKey: Hex,
   dni: string,
   bundler: string,
-  streamId = ''
+  streamId = '',
+  sponsorshipPolicyId?: string
 ) {
   try {
     if (!availableNetworks[chainId]) {
@@ -80,11 +81,23 @@ export async function createWalletOnChain(
       },
     });
 
+    const arbitrumParams = chainId.startsWith('arbitrum')
+      ? {
+          paymasterContext: { sponsorshipPolicyId },
+          userOperation: {
+            estimateFeesPerGas: async () => {
+              return (await pimlicoClient.getUserOperationGasPrice()).standard;
+            },
+          },
+        }
+      : {};
+
     const smartAccountClient = createSmartAccountClient({
       account,
       chain,
       bundlerTransport: http(bundler),
       paymaster: pimlicoClient,
+      ...arbitrumParams,
     });
 
     const idHash = bytesToHex(hashIdentifier(dni, salt.toString()));

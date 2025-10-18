@@ -79,6 +79,7 @@
     "@types/jest": "^29.5.14",
     "@types/pako": "^2.0.4",
     "@types/react": "^19.1.0",
+    "babel-plugin-transform-import-meta": "^2.3.3",
     "commitlint": "^19.8.1",
     "del-cli": "^6.0.0",
     "eslint": "^9.35.0",

@@ -18,6 +18,8 @@ import { DeviceId } from '../deviceId';
 import { discoverableHashFromDni } from '../register/idHash';
 import { getWiraDataFrom } from '../storage';
 import { RegistryApi } from '../register/registry';
+import { Biometric } from '../biometry';
+import * as Keychain from 'react-native-keychain';
 
 export class RecoveryService {
   async saveQrData(
@@ -26,6 +28,9 @@ export class RecoveryService {
     appName: string,
     registryUrl: string
   ) {
+    await Keychain.resetGenericPassword({ service: 'walletBundle' });
+    await Biometric.setBioFlag(false);
+
     const encryptedCredential = await encryptVCWithPin(data, pin);
 
     const encryptService = new EncryptionService();
@@ -66,6 +71,8 @@ export class RecoveryService {
     dni: string,
     appName: string
   ) {
+    await Keychain.resetGenericPassword({ service: 'walletBundle' });
+    await Biometric.setBioFlag(false);
     const encryptionService = new EncryptionService();
 
     const frontBase = await encryptionService.imageToBase64(frontImage.uri);
@@ -236,6 +243,9 @@ export class RecoveryService {
     pin: string,
     appName: string
   ) {
+    await Keychain.resetGenericPassword({ service: 'walletBundle' });
+    await Biometric.setBioFlag(false);
+
     const encryptedWithNewPin = await encryptVCWithPin(data, pin);
     const userUri = getUri(appName);
     const previousData = getWiraDataFrom(appName);

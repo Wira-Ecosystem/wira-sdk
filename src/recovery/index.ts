@@ -126,16 +126,83 @@ export class RecoveryService {
   async requestGalleryPermission() {
     if (Platform.OS !== 'android') return true;
 
-    let permission;
+    const androidVersion =
+      typeof Platform.Version === 'number' ? Platform.Version : 0;
 
-    if (Platform.Version >= 33) {
-      // Android 13+ - Permisos específicos de media
-      permission = PermissionsAndroid.PERMISSIONS.READ_MEDIA_IMAGES;
-    } else {
-      // Android < 13 - Permiso tradicional
-      permission = PermissionsAndroid.PERMISSIONS.WRITE_EXTERNAL_STORAGE;
+    // Android 13+ - Permisos específicos de media
+    if (androidVersion >= 33) {
+      const permission = PermissionsAndroid.PERMISSIONS.READ_MEDIA_IMAGES;
+      const status = await check(permission);
+      if (status === RESULTS.GRANTED) return true;
+
+      const granted = await request(permission, {
+        title: 'Permiso para galería',
+        message: 'Necesitamos acceso para guardar el QR en tu galería.',
+        buttonPositive: 'OK',
+      });
+
+      return granted === RESULTS.GRANTED;
+    }
+    // Android 10-12 (API 29-32) - Caso especial para Huawei/EMUI
+    // Necesita WRITE_EXTERNAL_STORAGE y posiblemente READ también
+    if (androidVersion >= 29) {
+      const writePermission =
+        PermissionsAndroid.PERMISSIONS.WRITE_EXTERNAL_STORAGE;
+      const readPermission =
+        PermissionsAndroid.PERMISSIONS.READ_EXTERNAL_STORAGE;
+
+      // Verificar estado actual
+      const writeStatus = await check(writePermission);
+      const readStatus = await check(readPermission);
+
+      if (writeStatus === RESULTS.GRANTED && readStatus === RESULTS.GRANTED) {
+        return true;
+      }
+
+      // Solicitar ambos permisos para Android 10
+      const results = await PermissionsAndroid.requestMultiple([
+        writePermission,
+        readPermission,
+      ]);
+
+      const writeGranted =
+        results[writePermission] === PermissionsAndroid.RESULTS.GRANTED;
+      const readGranted =
+        results[readPermission] === PermissionsAndroid.RESULTS.GRANTED;
+
+      // Fix específico para Huawei/EMUI Android 10:
+      // A veces el permiso se otorga pero no se refleja inmediatamente
+      if (!writeGranted || !readGranted) {
+        // Esperar un momento y re-verificar
+        await new Promise((resolve) => setTimeout(resolve, 500));
+
+        const reCheckWrite = await check(writePermission);
+        const reCheckRead = await check(readPermission);
+
+        if (
+          reCheckWrite === RESULTS.GRANTED &&
+          reCheckRead === RESULTS.GRANTED
+        ) {
+          return true;
+        }
+
+        // Si aún no están otorgados, mostrar alerta
+        Alert.alert(
+          'Permiso necesario',
+          'Para guardar el QR en tu dispositivo, necesitamos acceso al almacenamiento.\n\nPor favor, habilita el permiso en Configuración.',
+          [
+            { text: 'Abrir configuración', onPress: () => openSettings() },
+            { text: 'Cancelar', style: 'cancel' },
+          ]
+        );
+        return false;
+      }
+
+      return true;
     }
 
+    // Android < 10 - Permiso tradicional
+    const permission = PermissionsAndroid.PERMISSIONS.WRITE_EXTERNAL_STORAGE;
     const status = await check(permission);
     if (status === RESULTS.GRANTED) return true;
 
@@ -147,33 +214,48 @@ export class RecoveryService {
 
     if (granted === RESULTS.GRANTED) return true;
 
-    if (granted === RESULTS.DENIED || granted === RESULTS.BLOCKED) {
-      Alert.alert(
-        'Permiso denegado',
-        'Para guardar en la galería, habilita el permiso en Configuración > Permisos',
-        [
-          { text: 'Abrir configuración', onPress: () => openSettings() },
-          { text: 'OK' },
-        ]
-      );
-    }
+    Alert.alert(
+      'Permiso denegado',
+      'Para guardar en la galería, habilita el permiso en Configuración > Permisos',
+      [
+        { text: 'Abrir configuración', onPress: () => openSettings() },
+        { text: 'OK' },
+      ]
+    );
     return false;
   }
 
   async saveToGallery(base64Data: string, fileName: string) {
-    const picturesDir = `${RNFS.ExternalStorageDirectoryPath}/Pictures`;
+    // Para Android 10+, usar el directorio Pictures que es más accesible
+    const androidVersion =
+      typeof Platform.Version === 'number' ? Platform.Version : 0;
+    const picturesDir =
+      androidVersion >= 29
+        ? `${RNFS.PicturesDirectoryPath}`
+        : `${RNFS.ExternalStorageDirectoryPath}/Pictures`;
+
     const path = `${picturesDir}/${fileName}`;
 
-    if (!(await RNFS.exists(picturesDir))) {
-      await RNFS.mkdir(picturesDir);
-    }
-    await RNFS.writeFile(path, base64Data, 'base64');
-    // Notify media scanner about the new file
-    if (Platform.OS === 'android') {
-      await RNFS.scanFile(path);
-    }
+    try {
+      // Verificar si el directorio existe, si no, crearlo
+      const dirExists = await RNFS.exists(picturesDir);
+      if (!dirExists) {
+        await RNFS.mkdir(picturesDir);
+      }
 
-    return path; // devuelve la ruta por si la necesitas
+      // Escribir el archivo
+      await RNFS.writeFile(path, base64Data, 'base64');
+
+      // Notificar al escáner de medios sobre el nuevo archivo
+      if (Platform.OS === 'android') {
+        await RNFS.scanFile(path);
+      }
+
+      return path;
+    } catch (error) {
+      console.error('Error saving to gallery:', error);
+      throw error;
+    }
   }
 
   async saveQrOnDevice(b64Data: string) {

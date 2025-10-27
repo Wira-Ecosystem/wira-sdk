@@ -164,4 +164,16 @@ export class GuardiansApi {
     const response = await this.API.post(this.deviceTokenUrl, tokenInput);
     return response.data;
   }
+
+  async getThreshold(userDid: string) {
+    const response = await this.API.get(`/guardians/threshold/${userDid}`);
+    return response.data;
+  }
+
+  async updateThreshold(userDid: string, threshold: number) {
+    const response = await this.API.patch(`/guardians/threshold/${userDid}`, {
+      threshold,
+    });
+    return response.data;
+  }
 }

@@ -65,6 +65,10 @@ export function getWiraDataFrom(appName: string) {
   }
 }
 
+/**
+ * Share Wira session data with another app.
+ * @param appName - The package name of the app (e.g., 'com.wirawallet').
+ */
 async function shareData(appName: string) {
   const data = getWiraDataFrom(appName);
   if (!data) {
@@ -86,6 +90,23 @@ async function shareData(appName: string) {
   }
 }
 
+function saveSharedData(appName: string, receivedText: string) {
+  const credential = JSON.parse(receivedText);
+  if (!credential || !credential.credential) {
+    throw new Error('Invalid data received');
+  }
+
+  const userUri = getUri(appName);
+  const previousData = getWiraDataFrom(appName);
+  if (previousData) {
+    NativeWiraProvider.deleteUser(userUri);
+  }
+
+  const response = NativeWiraProvider.insertUser(userUri, credential);
+  return response;
+}
+
 export const Storage = {
   shareData,
+  saveSharedData,
 };

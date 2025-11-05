@@ -13,6 +13,7 @@ import { EncryptionService } from '../encryption';
 import { getUri } from '../common/utils';
 import { jsonStringifyWithBigInt } from '../vcCrypto/json';
 import { getWiraDataFrom } from '../storage';
+import { SharedSession } from '../shared-session';
 
 export type WalletData = {
   address: `0x${string}`;
@@ -40,7 +41,10 @@ export class Registerer {
   guardianAddress: `0x${string}` | null = null;
   dni: string | null = null;
   vc: any = null;
+  appName: string | null = null;
+  pin: string | null = null;
   registryApi: RegistryApi;
+  sharedSession: SharedSession;
   bundler: string;
   encryptService: EncryptionService;
   encryptedCredential: string | null = null;
@@ -59,6 +63,7 @@ export class Registerer {
     arbitrumSponsorshipPolicyId?: string
   ) {
     this.registryApi = new RegistryApi(registryUrl);
+    this.sharedSession = new SharedSession(registryUrl, '');
     this.bundler = bundler;
     this.encryptService = new EncryptionService();
     this.arbitrumSponsorshipPolicyId = arbitrumSponsorshipPolicyId;
@@ -165,6 +170,7 @@ export class Registerer {
         this.rawCredential,
         pin
       );
+      this.pin = pin;
 
       const userUri = getUri(appName);
 
@@ -172,6 +178,7 @@ export class Registerer {
       if (previousData) {
         NativeWiraProvider.deleteUser(userUri);
       }
+      this.appName = appName;
 
       const response = NativeWiraProvider.insertUser(userUri, {
         credential: this.encryptedCredential,
@@ -191,7 +198,12 @@ export class Registerer {
     if (!this.dni) {
       throw new Error('DNI is not initialized, did you call createWallet?');
     }
-    if (!this.encryptedCredential || !this.rawCredential) {
+    if (
+      !this.encryptedCredential ||
+      !this.rawCredential ||
+      !this.appName ||
+      !this.pin
+    ) {
       throw new Error(
         'No credential to store on server, did you call storeOnDevice?'
       );
@@ -204,7 +216,7 @@ export class Registerer {
     });
     this.encryptService.litNodeClient.disconnect();
 
-    return this.registryApi.registryRegister({
+    const response = await this.registryApi.registryRegister({
       did: this.subjectDid,
       accountAddress: this.walletData.address,
       guardianContractAddress: this.guardianAddress,
@@ -214,5 +226,14 @@ export class Registerer {
       ciphertext: encryptedData.ciphertext,
       dataToEncryptHash: encryptedData.dataToEncryptHash,
     });
+
+    await this.sharedSession.registerSharedSessionDevice(
+      this.dni,
+      this.appName,
+      this.pin,
+      this.rawCredential
+    );
+
+    return response;
   }
 }

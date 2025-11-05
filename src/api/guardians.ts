@@ -1,6 +1,7 @@
 import type { AxiosInstance } from 'axios';
 import axios from 'axios';
 import { discoverableHashFromDni } from '../register/idHash';
+import { getWiraConfig } from '../config';
 
 export type UpdateInput = {
   ownerDid: string;
@@ -76,7 +77,11 @@ export class GuardiansApi {
 
   inviteUrl = '/guardians/invite';
   async invite(inviteInput: InviteInput) {
-    const response = await this.API.post(this.inviteUrl, inviteInput);
+    const { appId } = getWiraConfig();
+    const response = await this.API.post(this.inviteUrl, {
+      ...inviteInput,
+      appId,
+    });
     return response.data;
   }
 
@@ -92,9 +97,10 @@ export class GuardiansApi {
     guardianDid: string,
     accept: 'accept' | 'reject'
   ) {
+    const { appId } = getWiraConfig();
     const response = await this.API.patch(
       `/guardians/invitation/${invitationId}/${accept}`,
-      { guardianDid }
+      { guardianDid, appId }
     );
     return response.data;
   }
@@ -116,10 +122,11 @@ export class GuardiansApi {
 
   requestRecoveryUrl = '/recovery/request';
   async requestRecovery(recoveryRequest: RecoveryRequestInput) {
-    const response = await this.API.post(
-      this.requestRecoveryUrl,
-      recoveryRequest
-    );
+    const { appId } = getWiraConfig();
+    const response = await this.API.post(this.requestRecoveryUrl, {
+      ...recoveryRequest,
+      appId,
+    });
     return response.data;
   }
 
@@ -138,10 +145,11 @@ export class GuardiansApi {
     accept: 'approve' | 'reject',
     input: RecoveryInput
   ) {
-    const response = await this.API.patch(
-      `/recovery/${requestId}/${accept}`,
-      input
-    );
+    const { appId } = getWiraConfig();
+    const response = await this.API.patch(`/recovery/${requestId}/${accept}`, {
+      ...input,
+      appId,
+    });
     return response.data;
   }
 
@@ -161,7 +169,11 @@ export class GuardiansApi {
 
   deviceTokenUrl = '/device-token';
   async deviceToken(tokenInput: TokenInput) {
-    const response = await this.API.post(this.deviceTokenUrl, tokenInput);
+    const { appId } = getWiraConfig();
+    const response = await this.API.post(this.deviceTokenUrl, {
+      ...tokenInput,
+      appId,
+    });
     return response.data;
   }
 

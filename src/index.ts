@@ -17,7 +17,8 @@ import {
   getWiraDataFrom,
   Storage,
 } from './storage';
-
+import { SharedSession } from './shared-session';
+import { getWiraConfig, initWiraSdk } from './config';
 /**
  * Get Wira user data from local storage or external apps.
  * @param ownAppName - The package name of the current app (e.g., 'com.wirawallet').I
@@ -29,7 +30,6 @@ function getWiraData(ownAppName: string) {
   if (userData) {
     return userData;
   }
-
   //check data on external apps
   userData = getDataFromExternalApps(ownAppName);
   if (userData) {
@@ -39,7 +39,6 @@ function getWiraData(ownAppName: string) {
     return null;
   }
 }
-
 /**
  * Sign in a user with their credential and PIN.
  * @param param0 - The user's credential.
@@ -54,7 +53,6 @@ async function signIn({ credential }: { credential: string }, pin: string) {
     throw new Error('Invalid PIN');
   }
 }
-
 /**
  * Check if the provided PIN is valid for the given app. This is done by attempting to decrypt the stored credential.
  * @param ownAppName - The package name of the current app (e.g., 'com.wirawallet').
@@ -73,7 +71,6 @@ async function checkPin(ownAppName: string, pin: string) {
     return false;
   }
 }
-
 /**
  * Toggle biometric authentication for the user.
  * @param userData - The user's data.
@@ -86,13 +83,11 @@ async function toggleBiometricAuth(userData: UserData, enabled: boolean) {
       if (!available) {
         throw new Error('Biometric authentication is not available');
       }
-
       if (!userData) {
         throw new Error(
           'User data is required to enable biometric authentication'
         );
       }
-
       await Keychain.setGenericPassword(
         'bundle',
         JSON.stringify({ stored: userData }),
@@ -116,7 +111,6 @@ async function toggleBiometricAuth(userData: UserData, enabled: boolean) {
     throw err;
   }
 }
-
 /**
  * Check biometric authentication status and prompt for authentication if enabled.
  * @returns Result of biometric authentication check, with userData if successful or error if failed.
@@ -126,33 +120,25 @@ async function checkBiometricAuth() {
   if (!enabled) {
     return { ok: false, error: 'Biometric authentication is disabled' };
   }
-
   const { available, biometryType } = await Biometric.biometryAvailability();
-
   if (!available || !biometryType)
     return { ok: false, error: 'Biometric authentication is not available' };
-
   const ok = await Biometric.biometricLogin(
     biometryType === 'FaceID'
       ? 'Escanea tu rostro'
       : 'Escanea tu huella dactilar'
   );
-
   if (!ok) {
     return { ok: false, error: 'Biometric login failed' };
   }
-
   const creds = await Keychain.getGenericPassword({
     service: 'walletBundle',
   });
-
   if (!creds) {
     return { ok: false, error: 'No credentials stored' };
   }
-
   return { ok: true, userData: JSON.parse(creds.password).stored };
 }
-
 async function updatePin(
   ownAppName: string,
   registryUrl: string,
@@ -163,36 +149,32 @@ async function updatePin(
   if (!userData) {
     throw new Error('No user data found');
   }
-
   const decryptedData = await signIn(userData as any, oldPin);
   const encryptedWithNewPin = await encryptVCWithPin(decryptedData, newPin);
-
   NativeWiraProvider.updateUser(getUri(ownAppName), {
     credential: encryptedWithNewPin,
   });
-
   const encryptService = new EncryptionService();
   const registryApi = new RegistryApi(registryUrl);
-
   await encryptService.connect();
   const encryptedData = await encryptService.encryptData({
     hashedData: encryptedWithNewPin,
     rawData: decryptedData,
   });
   encryptService.litNodeClient.disconnect();
-
   const registerResponse = await registryApi.updateRecoveryData(
     decryptedData.dni,
     encryptedData.ciphertext,
     encryptedData.dataToEncryptHash
   );
-
   if (!registerResponse.ok) {
     throw new Error('Failed to update data on server');
   }
 }
 
 const wira = {
+  initWiraSdk,
+  getWiraConfig,
   getWiraData,
   signIn,
   toggleBiometricAuth,
@@ -210,5 +192,6 @@ const wira = {
   DeviceId,
   Biometric,
   Storage,
+  SharedSession,
 };
 export default wira;

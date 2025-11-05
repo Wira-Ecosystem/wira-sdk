@@ -43,7 +43,5 @@ export async function ensureProvisioned({
   mock = true,
   gatewayBase,
 }: Provision) {
-  const have = await getProvision();
-  if (have?.issuer?.adminBase) return have;
   return fetchProvision({ mock, gatewayBase });
 }

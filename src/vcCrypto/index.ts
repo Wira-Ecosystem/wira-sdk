@@ -16,6 +16,15 @@ const highSecurityParams = {
   dkLen: 32,
 };
 
+export async function encryptKey(key: string, salt: Uint8Array) {
+  const derivedKey = await scryptAsync(
+    new TextEncoder().encode(key),
+    salt,
+    highSecurityParams
+  );
+  return hex(derivedKey);
+}
+
 export async function encryptVCWithPin(vcObj: Object, pin: string) {
   const salt = randomBytes(16);
   const derivedKey = await scryptAsync(

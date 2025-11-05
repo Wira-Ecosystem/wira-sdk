@@ -105,8 +105,6 @@ export async function waitForVC(
 }
 
 export function mapOcrToClaims(ocr: any = {}): Claims {
-  console.log(ocr);
-
   const fullName =
     ocr.fullName?.trim?.() ||
     ocr.full_name?.trim?.() ||

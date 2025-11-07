@@ -1,5 +1,6 @@
 {
   "name": "wira-sdk",
+  "author": "Juan Carlos",
   "version": "0.2.0",
   "description": "Wira self-sovereign identity and smart wallet library for react-native",
   "main": "./lib/module/index.js",
@@ -54,9 +55,8 @@
     "url": "git+https://github.com/Wira-Ecosystem/wira-sdk.git"
   },
   "contributors": [
-    "Huáscar Miranda <email> <url>",
-    "Jose Mendoza <email> <url>",
-    "Juan Carlos Arevalo <email> <url>"
+    "Huáscar Miranda",
+    "Jose Mendoza"
   ],
   "license": "MIT",
   "bugs": {
@@ -157,6 +157,14 @@
         }
       ]
     ]
+  },
+  "codegenConfig": {
+    "name": "WiraSdkSpec",
+    "type": "modules",
+    "jsSrcsDir": "src",
+    "android": {
+      "javaPackageName": "com.wirasdk"
+    }
   },
   "create-react-native-library": {
     "languages": "kotlin-objc",

@@ -1,112 +1,88 @@
-import { Share } from 'react-native';
-import NativeWiraProvider from '../provider/NativeWiraSdk';
+import Keychain, { hasGenericPassword } from 'react-native-keychain';
+import { BIO_SERVICE, KEY_SERVICE, KEY_USERNAME } from '../common/constants';
+import type { UserData } from '../register';
 import { jsonStringifyWithBigInt } from '../vcCrypto/json';
+import { Platform } from 'react-native';
 
 /**
- * Mock function to simulate fetching app names from an API.
- */
-export function getAppsNames() {
-  return ['com.wirawallet', 'com.appelectoral'];
-}
-
-/**
- * Get the content URI for a specific app.
- * @param appName - The package name of the app (e.g., 'com.wirawallet').
- * @returns The content URI for the app's user data.
- */
-export function getUri(appName: string) {
-  const modifiedAppName = appName.replace(/^com\./, '');
-  return `content://com.wira.${modifiedAppName}.provider/user`;
-}
-
-/**
- * Get user data from external apps.
- * @param ownAppName - The package name of the current app (e.g., 'com.wirawallet').
+ * Checks if user data is stored locally.
  * @returns found user data or null if not found.
  */
-export function getDataFromExternalApps(ownAppName: string) {
-  const apps = getAppsNames().filter((app) => app !== ownAppName);
-  let userData = null;
-
-  for (const appName of apps) {
-    const data = getWiraDataFrom(appName);
-    if (data) {
-      userData = data;
-      break;
-    }
-  }
-
-  return userData;
+async function checkUserData() {
+  return hasGenericPassword({ service: KEY_SERVICE });
 }
 
 /**
- * Get Wira data from a specific app.
- * @param appName - The package name of the app (e.g., 'com.wirawallet').
+ * Retrieves user data from secure storage.
  * @returns found user data or null if not found.
  */
-export function getWiraDataFrom(appName: string) {
-  const uri = getUri(appName);
-  console.log('Checking Wira data in:', uri);
-
-  try {
-    const response = NativeWiraProvider.queryUser(uri);
-    return Object.keys(response).length > 0 ? response : null;
-  } catch (error: any) {
-    console.log(error);
-    if (
-      error.message.includes(
-        "The query result was empty, but expected a single row to return a NON-NULL object of type 'com.nativewiraprovider.User'"
-      )
-    ) {
-      return null; // No data found on own app, return null
-    }
-    console.error('Error checking Wira data:', error);
+async function getUserData() {
+  const userData = await Keychain.getGenericPassword({ service: KEY_SERVICE });
+  if (userData) {
+    return JSON.parse(userData.password);
+  } else {
     return null;
   }
 }
 
 /**
- * Share Wira session data with another app.
- * @param appName - The package name of the app (e.g., 'com.wirawallet').
+ * Saves the encrypted user data to secure storage.
+ * @param encryptedUserData - The encrypted user data with pin.
  */
-async function shareData(appName: string) {
-  const data = getWiraDataFrom(appName);
-  if (!data) {
-    throw new Error('No data to share');
-  }
-  const jsonData = jsonStringifyWithBigInt(data);
+async function saveUserData(encryptedUserData: string) {
+  await Keychain.setGenericPassword(
+    KEY_USERNAME,
+    jsonStringifyWithBigInt({ credentials: encryptedUserData }),
+    { service: KEY_SERVICE }
+  );
+}
 
-  try {
-    const result = await Share.share({
-      message: jsonData,
-      title: 'Compartir datos de Wira',
-    });
-
-    if (result.action === Share.dismissedAction) {
-      console.log('Share dismissed');
-    }
-  } catch (error) {
-    console.error('Error sharing:', error);
+/**
+ * Retrieves the user data stored with biometric authentication.
+ * @returns found user data or null if not found.
+ */
+async function getBiometricUserData() {
+  const userData = await Keychain.getGenericPassword({ service: BIO_SERVICE });
+  if (userData) {
+    return JSON.parse(userData.password);
+  } else {
+    return null;
   }
 }
 
-function saveSharedData(appName: string, receivedText: string) {
-  const credential = JSON.parse(receivedText);
-  if (!credential || !credential.credential) {
-    throw new Error('Invalid data received');
-  }
+/**
+ * Saves the user data with biometric authentication.
+ * @param userData - The user data to save (not encrypted).
+ */
+async function saveUserDataWithBiometric(userData: UserData) {
+  await Keychain.setGenericPassword(
+    KEY_USERNAME,
+    jsonStringifyWithBigInt({ credentials: userData }),
+    {
+      service: BIO_SERVICE,
+      accessible: Keychain.ACCESSIBLE.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
+      accessControl:
+        Platform.OS === 'ios'
+          ? Keychain.ACCESS_CONTROL.BIOMETRY_CURRENT_SET
+          : Keychain.ACCESS_CONTROL.BIOMETRY_ANY,
+      securityLevel: Keychain.SECURITY_LEVEL.SECURE_HARDWARE,
+    }
+  );
+}
 
-  const userUri = getUri(appName);
-  const previousData = getWiraDataFrom(appName);
-  if (previousData) {
-    NativeWiraProvider.deleteUser(userUri);
-  }
-
-  const response = NativeWiraProvider.insertUser(userUri, credential);
-  return response;
+/**
+ * Deletes the user data stored with biometric authentication.
+ * This does not delete the main user data.
+ */
+async function deleteBiometricData() {
+  await Keychain.resetGenericPassword({ service: BIO_SERVICE });
 }
 
 export const Storage = {
-  shareData,
-  saveSharedData,
+  checkUserData,
+  getUserData,
+  saveUserData,
+  getBiometricUserData,
+  saveUserDataWithBiometric,
+  deleteBiometricData,
 };

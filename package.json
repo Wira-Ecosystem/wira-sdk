@@ -158,14 +158,6 @@
       ]
     ]
   },
-  "codegenConfig": {
-    "name": "WiraSdkSpec",
-    "type": "modules",
-    "jsSrcsDir": "src/provider",
-    "android": {
-      "javaPackageName": "com.wirasdk"
-    }
-  },
   "create-react-native-library": {
     "languages": "kotlin-objc",
     "type": "turbo-module",

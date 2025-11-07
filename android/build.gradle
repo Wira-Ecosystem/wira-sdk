@@ -75,12 +75,8 @@ repositories {
 def kotlin_version = getExtOrDefault("kotlinVersion")
 
 dependencies {
-  def room_version = "2.8.0"
-
   implementation "com.facebook.react:react-android"
   implementation "org.jetbrains.kotlin:kotlin-stdlib:$kotlin_version"
   annotationProcessor 'com.google.dagger:dagger-compiler:2.57.1'
   ksp 'com.google.dagger:dagger-compiler:2.57.1'
-  implementation "androidx.room:room-runtime:$room_version"
-  ksp "androidx.room:room-compiler:$room_version"
 }

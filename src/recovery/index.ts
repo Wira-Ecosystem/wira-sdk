@@ -1,7 +1,5 @@
 import { PermissionsAndroid, Platform } from 'react-native';
-import { getUri } from '../common/utils';
 import { EncryptionService } from '../encryption';
-import NativeWiraProvider from '../provider/NativeWiraSdk';
 import pako from 'pako';
 import {
   check,
@@ -16,25 +14,23 @@ import { encryptVCWithPin } from '../vcCrypto';
 import { jsonStringifyWithBigInt } from '../vcCrypto/json';
 import { DeviceId } from '../deviceId';
 import { discoverableHashFromDni } from '../register/idHash';
-import { getWiraDataFrom } from '../storage';
+import { Storage } from '../storage';
 import { RegistryApi } from '../register/registry';
 import { Biometric } from '../biometry';
-import * as Keychain from 'react-native-keychain';
+import { SharedSession } from '../shared-session';
 
 export class RecoveryService {
   async saveQrData(
     data: any,
     pin: string,
-    appName: string,
+    sharedSessionSchema: string,
     registryUrl: string
   ) {
-    await Keychain.resetGenericPassword({ service: 'walletBundle' });
-    await Biometric.setBioFlag(false);
-
     const encryptedCredential = await encryptVCWithPin(data, pin);
 
     const encryptService = new EncryptionService();
     const registryApi = new RegistryApi(registryUrl);
+    const sharedSession = new SharedSession(registryUrl, sharedSessionSchema);
 
     await encryptService.connect();
     const encryptedData = await encryptService.encryptData({
@@ -53,26 +49,23 @@ export class RecoveryService {
       throw new Error('Failed to update data on server');
     }
 
-    const userUri = getUri(appName);
-    const previousData = getWiraDataFrom(appName);
-    if (previousData) {
-      NativeWiraProvider.deleteUser(userUri);
+    await sharedSession.registerSharedSessionDevice(data.dni, pin, data);
+
+    const useBiometry = await Biometric.getBioFlag();
+    if (useBiometry) {
+      await Storage.saveUserDataWithBiometric(data);
     }
-    const response = NativeWiraProvider.insertUser(userUri, {
-      credential: encryptedCredential,
-    });
-    return response;
+    await Storage.saveUserData(encryptedCredential);
   }
 
   async recoveryAndSave(
     frontImage: any,
     backImage: any,
     selfieImage: any,
-    dni: string,
-    appName: string
+    dni: string
   ) {
-    await Keychain.resetGenericPassword({ service: 'walletBundle' });
-    await Biometric.setBioFlag(false);
+    await Storage.deleteBiometricData();
+
     const encryptionService = new EncryptionService();
 
     const frontBase = await encryptionService.imageToBase64(frontImage.uri);
@@ -98,17 +91,7 @@ export class RecoveryService {
       throw new Error('Data recovery failed: ' + response.error);
     }
 
-    const userUri = getUri(appName);
-    const previousData = getWiraDataFrom(appName);
-    if (previousData) {
-      NativeWiraProvider.deleteUser(userUri);
-    }
-
-    NativeWiraProvider.insertUser(userUri, {
-      credential: response.data,
-    });
-
-    return response;
+    await Storage.saveUserData(response.data);
   }
 
   prepareQrData(data: object) {
@@ -321,22 +304,20 @@ export class RecoveryService {
   }
 
   async saveRecoveryDataFromGuardians(
-    data: object,
+    data: any,
     pin: string,
-    appName: string
+    registryUrl: string,
+    sharedSessionSchema: string
   ) {
-    await Keychain.resetGenericPassword({ service: 'walletBundle' });
-    await Biometric.setBioFlag(false);
+    const sharedSession = new SharedSession(registryUrl, sharedSessionSchema);
 
     const encryptedWithNewPin = await encryptVCWithPin(data, pin);
-    const userUri = getUri(appName);
-    const previousData = getWiraDataFrom(appName);
-    if (previousData) {
-      NativeWiraProvider.deleteUser(userUri);
+    await sharedSession.registerSharedSessionDevice(data.dni, pin, data);
+
+    const useBiometry = await Biometric.getBioFlag();
+    if (useBiometry) {
+      await Storage.saveUserDataWithBiometric(data);
     }
-    const response = NativeWiraProvider.insertUser(userUri, {
-      credential: encryptedWithNewPin,
-    });
-    return response;
+    await Storage.saveUserData(encryptedWithNewPin);
   }
 }

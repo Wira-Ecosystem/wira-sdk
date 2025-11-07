@@ -6,16 +6,16 @@ import { decryptVCWithPin, encryptKey, encryptVCWithPin } from '../vcCrypto';
 import { bytesToHex, hexToBytes, randomBytes } from '@noble/hashes/utils.js';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SALT } from '../common/constants';
-import { getUri, getWiraDataFrom } from '../storage';
-import NativeWiraProvider from '../provider/NativeWiraSdk';
+import { Storage } from '../storage';
+import { Biometric } from '../biometry';
 
 export class SharedSession {
   api: AuthApi;
-  appUrl: string;
+  sharedSessionSchema: string;
 
-  constructor(url: string, appUrl: string) {
+  constructor(url: string, sharedSessionSchema: string) {
     this.api = new AuthApi(url);
-    this.appUrl = appUrl;
+    this.sharedSessionSchema = sharedSessionSchema;
   }
 
   async checkRegisteredOnThisDevice(dni: string) {
@@ -31,12 +31,7 @@ export class SharedSession {
     }
   }
 
-  async registerSharedSessionDevice(
-    dni: string,
-    packageName: string,
-    pin: string,
-    data: any
-  ) {
+  async registerSharedSessionDevice(dni: string, pin: string, data: any) {
     const discoverableHash = discoverableHashFromDni(dni);
     const key = `${await DeviceId.getDeviceId()}:${pin}`;
     const sessionToken = await encryptVCWithPin(data, key);
@@ -46,7 +41,7 @@ export class SharedSession {
 
     await this.api.registerApp({
       discoverableHash,
-      packageName,
+      packageName: this.sharedSessionSchema,
       userHash: encryptedKey,
       sessionToken,
     });
@@ -64,7 +59,7 @@ export class SharedSession {
     }
 
     const url = new URL(target.package + '://shared.request');
-    url.searchParams.append('source', this.appUrl);
+    url.searchParams.append('source', this.sharedSessionSchema);
     const fullUrl = url.toString();
 
     await Linking.openURL(fullUrl);
@@ -145,16 +140,13 @@ export class SharedSession {
     const data = await decryptVCWithPin(response.session, `${deviceId}:${pin}`);
 
     const encryptedData = await encryptVCWithPin(data, pin);
-    const userUri = getUri(this.appUrl);
+    await this.registerSharedSessionDevice(data.dni, pin, data);
 
-    const previousData = getWiraDataFrom(this.appUrl);
-    if (previousData) {
-      NativeWiraProvider.deleteUser(userUri);
+    const useBiometry = await Biometric.getBioFlag();
+    if (useBiometry) {
+      await Storage.saveUserDataWithBiometric(data);
     }
-
-    NativeWiraProvider.insertUser(userUri, {
-      credential: encryptedData,
-    });
+    await Storage.saveUserData(encryptedData);
     return data;
   }
 }

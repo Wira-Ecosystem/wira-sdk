@@ -9,12 +9,116 @@ import {
 } from 'viem';
 import { availableNetworks, FACTORY_ADDRESS } from '../common/params';
 import { randomBytes, utf8ToBytes } from '@noble/hashes/utils.js';
-import { toSimpleSmartAccount } from 'permissionless/accounts';
+import {
+  toSimpleSmartAccount,
+  type SimpleSmartAccountImplementation,
+} from 'permissionless/accounts';
 import { privateKeyToAccount } from 'viem/accounts';
-import { entryPoint07Address } from 'viem/account-abstraction';
+import {
+  entryPoint07Address,
+  type SmartAccount,
+} from 'viem/account-abstraction';
 import { createPimlicoClient } from 'permissionless/clients/pimlico';
 import { createSmartAccountClient } from 'permissionless';
 import { keccak_256 } from '@noble/hashes/sha3.js';
+
+export class Wallet {
+  constructor(
+    private privateKey: Hex,
+    private salt: string,
+    private address: Hex,
+    private chainId: keyof typeof availableNetworks,
+    private bundler: string,
+    private arbitrumSponsorshipPolicyId?: string
+  ) {}
+
+  async getAccount(): Promise<{
+    account: SmartAccount<SimpleSmartAccountImplementation>;
+    publicClient: any;
+  }> {
+    const owner = privateKeyToAccount(this.privateKey);
+
+    const publicClient = createPublicClient({
+      chain: availableNetworks[this.chainId].chain,
+      transport: http(),
+    });
+
+    const account = await toSimpleSmartAccount({
+      client: publicClient,
+      index: BigInt(this.salt),
+      address: this.address,
+      factoryAddress: FACTORY_ADDRESS,
+      owner,
+      entryPoint: { address: entryPoint07Address, version: '0.7' },
+    });
+
+    return { account, publicClient };
+  }
+
+  async executeOperation(
+    callData: any,
+    waitEvent: (
+      chain: string,
+      eventName: string,
+      txBlock: bigint,
+      attempts?: number
+    ) => Promise<any>,
+    eventName: string
+  ) {
+    const { account, publicClient } = await this.getAccount();
+    const { chain } = availableNetworks[this.chainId];
+
+    const pimlicoClient = createPimlicoClient({
+      chain,
+      transport: http(this.bundler),
+      entryPoint: {
+        address: entryPoint07Address,
+        version: '0.7',
+      },
+    });
+
+    const arbitrumParams = this.chainId.startsWith('arbitrum')
+      ? {
+          paymasterContext: {
+            sponsorshipPolicyId: this.arbitrumSponsorshipPolicyId,
+          },
+          userOperation: {
+            estimateFeesPerGas: async () => {
+              return (await pimlicoClient.getUserOperationGasPrice()).standard;
+            },
+          },
+        }
+      : {};
+
+    const smartAccountClient = createSmartAccountClient({
+      account,
+      chain,
+      bundlerTransport: http(this.bundler),
+      paymaster: pimlicoClient,
+      ...arbitrumParams,
+    });
+
+    const txHash = await smartAccountClient.sendTransaction(callData);
+    const receipt = await publicClient.waitForTransactionReceipt({
+      hash: txHash,
+    });
+
+    let returnData;
+    if (waitEvent && eventName) {
+      returnData = await waitEvent(
+        this.chainId,
+        eventName,
+        receipt.blockNumber
+      );
+    }
+
+    const block = await publicClient.getBlock({
+      blockNumber: receipt.blockNumber,
+    });
+    const date = new Date(Number(block.timestamp) * 1000);
+    return { returnData, receipt, date: date.toLocaleString() };
+  }
+}
 
 export async function predictWalletAddress(
   chain: keyof typeof availableNetworks,

@@ -11,6 +11,8 @@ import { Biometric } from './biometry';
 import { Storage } from './storage';
 import { SharedSession } from './shared-session';
 import { getWiraConfig, initWiraSdk } from './config';
+import { Wallet } from './wallet';
+import { WalletCalls } from './wallet/calls';
 
 type SignInOptions = {
   registryUrl: string;
@@ -165,5 +167,7 @@ const wira = {
   Biometric,
   Storage,
   SharedSession,
+  Wallet,
+  WalletCalls,
 };
 export default wira;

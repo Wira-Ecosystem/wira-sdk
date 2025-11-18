@@ -5,14 +5,11 @@ import { bytesToHex, type Hex } from 'viem';
 import { didFromEthAddress } from './did';
 import { createCredential, mapOcrToClaims, waitForVC } from './issuerClient';
 import { RegistryApi } from './registry';
-import NativeWiraProvider from '../provider/NativeWiraSdk';
 import { encryptVCWithPin } from '../vcCrypto';
-import * as Keychain from 'react-native-keychain';
-import { Platform } from 'react-native';
 import { EncryptionService } from '../encryption';
-import { getUri } from '../common/utils';
-import { jsonStringifyWithBigInt } from '../vcCrypto/json';
-import { getWiraDataFrom } from '../storage';
+import { Storage } from '../storage';
+import { SharedSession } from '../shared-session';
+import { Biometric } from '../biometry';
 
 export type WalletData = {
   address: `0x${string}`;
@@ -40,7 +37,10 @@ export class Registerer {
   guardianAddress: `0x${string}` | null = null;
   dni: string | null = null;
   vc: any = null;
+  appName: string | null = null;
+  pin: string | null = null;
   registryApi: RegistryApi;
+  sharedSession: SharedSession;
   bundler: string;
   encryptService: EncryptionService;
   encryptedCredential: string | null = null;
@@ -55,10 +55,12 @@ export class Registerer {
    */
   constructor(
     registryUrl: string,
+    sharedSessionSchema: string,
     bundler: string,
     arbitrumSponsorshipPolicyId?: string
   ) {
     this.registryApi = new RegistryApi(registryUrl);
+    this.sharedSession = new SharedSession(registryUrl, sharedSessionSchema);
     this.bundler = bundler;
     this.encryptService = new EncryptionService();
     this.arbitrumSponsorshipPolicyId = arbitrumSponsorshipPolicyId;
@@ -121,7 +123,7 @@ export class Registerer {
     return response;
   }
 
-  async storeOnDevice(appName: string, pin: string, useBiometry: boolean) {
+  async storeOnDevice(pin: string, useBiometry: boolean) {
     if (!this.vc) {
       throw new Error('VC is not initialized, did you call createVC?');
     }
@@ -146,37 +148,17 @@ export class Registerer {
 
     try {
       if (useBiometry) {
-        await Keychain.setGenericPassword(
-          'bundle',
-          jsonStringifyWithBigInt({ stored: this.rawCredential }),
-          {
-            service: 'walletBundle',
-            accessible: Keychain.ACCESSIBLE.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
-            accessControl:
-              Platform.OS === 'ios'
-                ? Keychain.ACCESS_CONTROL.BIOMETRY_CURRENT_SET
-                : Keychain.ACCESS_CONTROL.BIOMETRY_ANY,
-            securityLevel: Keychain.SECURITY_LEVEL.SECURE_HARDWARE,
-          }
-        );
+        await Storage.saveUserDataWithBiometric(this.rawCredential);
+        await Biometric.setBioFlag(true);
       }
 
       this.encryptedCredential = await encryptVCWithPin(
         this.rawCredential,
         pin
       );
+      this.pin = pin;
 
-      const userUri = getUri(appName);
-
-      const previousData = getWiraDataFrom(appName);
-      if (previousData) {
-        NativeWiraProvider.deleteUser(userUri);
-      }
-
-      const response = NativeWiraProvider.insertUser(userUri, {
-        credential: this.encryptedCredential,
-      });
-      return response;
+      await Storage.saveUserData(this.encryptedCredential);
     } catch (error) {
       throw new Error('Error saving Wira data: ' + error);
     }
@@ -191,7 +173,7 @@ export class Registerer {
     if (!this.dni) {
       throw new Error('DNI is not initialized, did you call createWallet?');
     }
-    if (!this.encryptedCredential || !this.rawCredential) {
+    if (!this.encryptedCredential || !this.rawCredential || !this.pin) {
       throw new Error(
         'No credential to store on server, did you call storeOnDevice?'
       );
@@ -204,7 +186,7 @@ export class Registerer {
     });
     this.encryptService.litNodeClient.disconnect();
 
-    return this.registryApi.registryRegister({
+    const response = await this.registryApi.registryRegister({
       did: this.subjectDid,
       accountAddress: this.walletData.address,
       guardianContractAddress: this.guardianAddress,
@@ -214,5 +196,13 @@ export class Registerer {
       ciphertext: encryptedData.ciphertext,
       dataToEncryptHash: encryptedData.dataToEncryptHash,
     });
+
+    await this.sharedSession.registerSharedSessionDevice(
+      this.dni,
+      this.pin,
+      this.rawCredential
+    );
+
+    return response;
   }
 }

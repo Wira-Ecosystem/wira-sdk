@@ -12,18 +12,32 @@ import { Storage } from './storage';
 import { SharedSession } from './shared-session';
 import { getWiraConfig, initWiraSdk } from './config';
 
+type SignInOptions = {
+  registryUrl: string;
+  sharedSessionSchema: string;
+};
+
 /**
  * Sign in a user with their credential and PIN.
  * @param pin - The user's PIN.
+ * @param registerDevice - Optional parameters for registering the device for shared sessions.
  * @returns The decrypted user data.
  */
-async function signIn(pin: string) {
+async function signIn(pin: string, registerDevice?: SignInOptions) {
   try {
     const userData = await Storage.getUserData();
     if (!userData) {
       throw new Error('No user data found');
     }
-    return decryptVCWithPin(userData.credentials, pin);
+    const data = await decryptVCWithPin(userData.credentials, pin);
+    if (registerDevice) {
+      const sharedSession = new SharedSession(
+        registerDevice.registryUrl,
+        registerDevice.sharedSessionSchema
+      );
+      await sharedSession.registerSharedSessionDevice(data.dni, pin, data);
+    }
+    return data;
   } catch (error) {
     console.error('Error signing in:', error);
     throw new Error('Invalid PIN');

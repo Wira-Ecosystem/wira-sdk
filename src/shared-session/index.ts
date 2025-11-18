@@ -50,9 +50,13 @@ export class SharedSession {
   }
 
   async openFirstAppFound(targets: any[]) {
-    const target = targets.find(async (t) => {
-      return await Linking.canOpenURL(t.package + '://shared.request');
-    });
+    let target: any = null;
+    for (const t of targets) {
+      if (t.package !== this.sharedSessionSchema) {
+        target = t;
+        break;
+      }
+    }
 
     if (!target) {
       throw new Error('No supported app found');
@@ -87,32 +91,26 @@ export class SharedSession {
     await Linking.openURL(fullUrl);
   }
 
-  async handleOpenApp(onOpen: (url: string) => void) {
-    const url = await Linking.getInitialURL();
-    if (url) {
-      onOpen(url);
-    } else {
-      Linking.addEventListener('url', (event) => {
-        onOpen(event.url);
-      });
-    }
-  }
-
   async handleShareResponse(
+    onRequest: (fromUrl: string) => void,
     onAccept: (deviceId: string, salt: string) => void,
     onReject: () => void
   ) {
     const processUrl = async (initialUrl: string) => {
       const url = new URL(initialUrl);
-      const accepted = url.searchParams.get('accepted');
-      if (accepted === 'true') {
-        const id = url.searchParams.get('deviceId');
-        const salt = url.searchParams.get('salt');
-        if (id && salt) {
-          onAccept(id, salt);
+      if (url.hostname === 'shared.request') {
+        onRequest(initialUrl);
+      } else if (url.hostname === 'shared.response') {
+        const accepted = url.searchParams.get('accepted');
+        if (accepted === 'true') {
+          const id = url.searchParams.get('deviceId');
+          const salt = url.searchParams.get('salt');
+          if (id && salt) {
+            onAccept(id, salt);
+          }
+        } else {
+          onReject();
         }
-      } else {
-        onReject();
       }
     };
 

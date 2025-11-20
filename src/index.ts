@@ -40,9 +40,11 @@ async function signIn(pin: string, registerDevice?: SignInOptions) {
       await sharedSession.registerSharedSessionDevice(data.dni, pin, data);
     }
     return data;
-  } catch (error) {
-    console.error('Error signing in:', error);
-    throw new Error('Invalid PIN');
+  } catch (error: any) {
+    if (error.message === 'No user data found') {
+      throw error;
+    }
+    throw new Error('Decryption failed, Invalid PIN?: ' + error.message);
   }
 }
 /**

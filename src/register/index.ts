@@ -1,15 +1,17 @@
-import { randomBytes } from '@noble/hashes/utils.js';
 import { createWalletOnChain, predictWalletAddress } from '../wallet';
 import type { availableNetworks } from '../common/params';
-import { bytesToHex, type Hex } from 'viem';
-import { didFromEthAddress } from './did';
-import { createCredential, mapOcrToClaims, waitForVC } from './issuerClient';
+import {
+  createCredential,
+  getCredential,
+  mapOcrToClaims,
+} from './issuerClient';
 import { RegistryApi } from './registry';
 import { encryptVCWithPin } from '../vcCrypto';
 import { EncryptionService } from '../encryption';
 import { Storage } from '../storage';
 import { SharedSession } from '../shared-session';
 import { Biometric } from '../biometry';
+import WiraSdk from '../NativeWiraSdk';
 
 export type WalletData = {
   address: `0x${string}`;
@@ -18,11 +20,10 @@ export type WalletData = {
 };
 
 export type UserData = {
-  vc: string;
   dni: string;
   salt: bigint;
   privKey: string;
-  account: string;
+  account: `0x${string}`;
   guardian: string | null;
   did: string;
 };
@@ -36,15 +37,14 @@ export class Registerer {
   subjectDid: string | null = null;
   guardianAddress: `0x${string}` | null = null;
   dni: string | null = null;
-  vc: any = null;
   appName: string | null = null;
   pin: string | null = null;
   registryApi: RegistryApi;
   sharedSession: SharedSession;
   bundler: string;
   encryptService: EncryptionService;
-  encryptedCredential: string | null = null;
-  rawCredential: UserData | null = null;
+  userData: UserData | null = null;
+  encryptedUserData: string | null = null;
   arbitrumSponsorshipPolicyId: string | undefined = undefined;
 
   /**
@@ -70,25 +70,36 @@ export class Registerer {
     chain: keyof typeof availableNetworks,
     ocrData: any,
     credType: string,
-    credExpirationDays: string,
-    ownerPk?: Hex
+    credExpirationDays: string
   ) {
-    const privKey = ownerPk ?? bytesToHex(randomBytes(32));
-    this.walletData = {
-      ...(await predictWalletAddress(chain, privKey)),
-      privateKey: privKey,
-    };
+    const { success, identity, error } = JSON.parse(
+      await WiraSdk.addIdentity()
+    );
+    if (!success) {
+      throw new Error('Error creating identity: ' + error);
+    }
 
-    const { did } = didFromEthAddress(this.walletData.address);
+    const { did, privateKey } = JSON.parse(identity);
+    if (typeof did !== 'string' || typeof privateKey !== 'string') {
+      throw new Error('Error creating identity: did or privateKey missing');
+    }
+
+    this.walletData = {
+      ...(await predictWalletAddress(chain, `0x${privateKey}`)),
+      privateKey: `0x${privateKey}`,
+    };
     this.subjectDid = did;
+
     const claims = mapOcrToClaims(ocrData);
     const { id: credentialId } = await createCredential(
       this.subjectDid,
+      privateKey,
       claims,
       credType,
       credExpirationDays
     );
-    const vc = await waitForVC(credentialId);
+
+    const vc = await getCredential(credentialId, this.subjectDid, privateKey);
     if (
       vc?.credentialSubject?.id &&
       vc.credentialSubject.id !== this.subjectDid
@@ -97,7 +108,6 @@ export class Registerer {
     }
 
     this.chain = chain;
-    this.vc = vc;
     return vc;
   }
 
@@ -124,9 +134,6 @@ export class Registerer {
   }
 
   async storeOnDevice(pin: string, useBiometry: boolean) {
-    if (!this.vc) {
-      throw new Error('VC is not initialized, did you call createVC?');
-    }
     if (!this.dni) {
       throw new Error('DNI is not initialized, did you call createWallet?');
     }
@@ -136,8 +143,7 @@ export class Registerer {
       );
     }
 
-    this.rawCredential = {
-      vc: this.vc,
+    this.userData = {
       dni: this.dni,
       salt: this.walletData.salt,
       privKey: this.walletData.privateKey,
@@ -148,17 +154,14 @@ export class Registerer {
 
     try {
       if (useBiometry) {
-        await Storage.saveUserDataWithBiometric(this.rawCredential);
+        await Storage.saveUserDataWithBiometric(this.userData);
         await Biometric.setBioFlag(true);
       }
 
-      this.encryptedCredential = await encryptVCWithPin(
-        this.rawCredential,
-        pin
-      );
+      this.encryptedUserData = await encryptVCWithPin(this.userData, pin);
       this.pin = pin;
 
-      await Storage.saveUserData(this.encryptedCredential);
+      await Storage.saveUserData(this.encryptedUserData);
     } catch (error) {
       throw new Error('Error saving Wira data: ' + error);
     }
@@ -173,22 +176,48 @@ export class Registerer {
     if (!this.dni) {
       throw new Error('DNI is not initialized, did you call createWallet?');
     }
-    if (!this.encryptedCredential || !this.rawCredential || !this.pin) {
+    if (!this.userData || !this.encryptedUserData || !this.pin) {
       throw new Error(
         'No credential to store on server, did you call storeOnDevice?'
       );
     }
 
+    const backupResponse = JSON.parse(
+      await WiraSdk.backupIdentity(
+        this.subjectDid,
+        this.walletData.privateKey.replace('0x', '')
+      )
+    );
+
+    if (!backupResponse.success) {
+      throw new Error(
+        'Error backing up identity: ' +
+          (backupResponse.error || 'unknown error')
+      );
+    }
+
+    const userDataWithIdentity = {
+      ...this.userData,
+      identity: backupResponse.backup,
+    };
+    console.log('User data with identity to store on server:');
+    console.log(userDataWithIdentity);
+
+    const hashedDataWithIdentity = await encryptVCWithPin(
+      userDataWithIdentity,
+      this.pin
+    );
+
     await this.encryptService.connect();
     const encryptedData = await this.encryptService.encryptData({
-      hashedData: this.encryptedCredential,
-      rawData: this.rawCredential,
+      hashedData: hashedDataWithIdentity,
+      rawData: userDataWithIdentity,
     });
     this.encryptService.litNodeClient.disconnect();
 
     const response = await this.registryApi.registryRegister({
       did: this.subjectDid,
-      accountAddress: this.walletData.address,
+      accountAddress: this.userData.account,
       guardianContractAddress: this.guardianAddress,
       displayNamePublic: null,
       discoverableHashOptIn: true, // opt-in
@@ -200,7 +229,7 @@ export class Registerer {
     await this.sharedSession.registerSharedSessionDevice(
       this.dni,
       this.pin,
-      this.rawCredential
+      userDataWithIdentity
     );
 
     return response;

@@ -26,10 +26,5 @@
             <category android:name="android.intent.category.LAUNCHER" />
         </intent-filter>
       </activity>
-      <provider
-        android:authorities="com.wira.exampleapp.provider"
-        android:name="com.nativewiraprovider.WiraContentProvider"
-        android:permission="wira.permission.ACCESS_DATA"
-        android:exported="true"/>
     </application>
 </manifest>

@@ -16,6 +16,9 @@ if linkage != nil
   use_frameworks! :linkage => linkage.to_sym
 end
 
+flutter_application_path = '../wira_flutter_module'
+load File.join(flutter_application_path, '.ios', 'Flutter', 'podhelper.rb')
+
 target 'WiraSdkExample' do
   config = use_native_modules!
 
@@ -24,6 +27,7 @@ target 'WiraSdkExample' do
     # An absolute path to your application root.
     :app_path => "#{Pod::Config.instance.installation_root}/.."
   )
+  install_all_flutter_pods(flutter_application_path)
 
   post_install do |installer|
     # https://github.com/facebook/react-native/blob/main/packages/react-native/scripts/react_native_pods.rb#L197-L202

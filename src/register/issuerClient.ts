@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { Buffer } from 'buffer';
 import { getProvision } from '../common/provisionClient';
+import WiraSdk from '../NativeWiraSdk';
 
 export type Claims = {
   fullName: string;
@@ -10,9 +11,6 @@ export type Claims = {
 
 function stripTrailingSlash(s = '') {
   return String(s || '').replace(/\/+$/, '');
-}
-function joinPath(a = '', b = '') {
-  return `${stripTrailingSlash(a)}/${String(b).replace(/^\/+/, '')}`;
 }
 
 async function buildAuthHeader() {
@@ -36,30 +34,24 @@ async function getIssuerApi() {
   });
 }
 
-async function getCreatePath() {
+async function getIssuerDid() {
   const prov = await getProvision();
-
-  const p = prov?.issuer?.createCredentialPath;
-  if (!p) throw new Error('createCredentialPath no entregado');
-  return p;
-}
-
-async function getGetPath(credentialId: string) {
-  const prov = await getProvision();
-  const tmpl = prov?.issuer?.getUniversalLinkPath;
-  if (tmpl && tmpl.includes('{id}') && !/qrcode/i.test(tmpl)) {
-    return tmpl.replace('{id}', encodeURIComponent(credentialId));
-  }
-  const base = await getCreatePath();
-  return joinPath(base, encodeURIComponent(credentialId));
+  const did = prov?.issuer?.issuerDid;
+  if (!did) throw new Error('Issuer DID no entregado');
+  return did;
 }
 
 export async function createCredential(
   subjectDid: string,
+  privateKey: string,
   claims: Claims,
   credType: string,
   credExpirationDays: string
 ) {
+  const api = await getIssuerApi();
+  const issuerDid = await getIssuerDid();
+  await authenticate(subjectDid, privateKey);
+
   const expiration =
     Math.floor(Date.now() / 1000) +
     parseInt(credExpirationDays || '365', 10) * 86400;
@@ -71,37 +63,73 @@ export async function createCredential(
     expiration,
   };
 
-  const api = await getIssuerApi();
-
-  const path = await getCreatePath();
-
-  const { data } = await api.post(path, body);
-
-  return data;
-}
-
-export async function getCredential(credentialId: string) {
-  const api = await getIssuerApi();
-  const path = await getGetPath(credentialId);
-  const { data } = await api.get(path);
-  return data;
-}
-
-export async function waitForVC(
-  id: string,
-  { tries = 20, delayMs = 1500 }: { tries?: number; delayMs?: number } = {}
-) {
-  let lastErr;
-  for (let i = 0; i < tries; i++) {
-    try {
-      const vc = await getCredential(id);
-      if (vc?.id) return vc;
-    } catch (e) {
-      lastErr = e;
-    }
-    await new Promise((r) => setTimeout(r, delayMs));
+  const issuerCredResponse = await api.post(
+    `/v2/identities/${issuerDid}/credentials`,
+    body
+  );
+  const credentialData = await issuerCredResponse.data;
+  if (!credentialData) {
+    throw new Error('Invalid credential response: no data');
   }
-  throw lastErr || new Error('Timeout esperando VC');
+
+  return credentialData;
+}
+
+export async function authenticate(userDid: string, userPk: string) {
+  const api = await getIssuerApi();
+  const issuerDid = await getIssuerDid();
+
+  const issuerResponse = await api.post(
+    `/v2/${issuerDid}/authentication?type=raw`
+  );
+
+  const authData = await issuerResponse.data;
+  if (!authData.message) {
+    throw new Error('Invalid authentication response: missing message');
+  }
+
+  const authResponse = JSON.parse(
+    await WiraSdk.authenticate(authData.message, userDid, userPk)
+  );
+  if (!authResponse.success) {
+    throw new Error(
+      'Authentication failed: ' + (authResponse.error || 'unknown error')
+    );
+  }
+}
+
+export async function getCredential(
+  credentialId: string,
+  userDid: string,
+  userPk: string
+) {
+  const api = await getIssuerApi();
+  const issuerDid = await getIssuerDid();
+
+  const offerResponse = await api.get(
+    `/v2/identities/${issuerDid}/credentials/${credentialId}/offer?type=raw`
+  );
+
+  const offerData = await offerResponse.data;
+  if (!offerData.universalLink) {
+    throw new Error('Invalid credential offer response: missing universalLink');
+  }
+
+  const claimResponse = JSON.parse(
+    await WiraSdk.claimCredential(offerData.universalLink, userDid, userPk)
+  );
+  if (!claimResponse.success) {
+    throw new Error(
+      'Claiming credential failed: ' + (claimResponse.error || 'unknown error')
+    );
+  }
+
+  const vc = claimResponse.credentials[0].info;
+  if (!vc) {
+    throw new Error('Claimed credential is missing info');
+  }
+
+  return vc;
 }
 
 export function mapOcrToClaims(ocr: any = {}): Claims {

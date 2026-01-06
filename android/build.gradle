@@ -67,9 +67,17 @@ android {
   }
 }
 
+String storageUrl = System.env.FLUTTER_STORAGE_BASE_URL ?: "https://storage.googleapis.com"
+
 repositories {
   mavenCentral()
   google()
+  maven {
+    url '/media/john/IdeaSpace/Workspace/zk-login/flutter/wira_flutter_module/build/host/outputs/repo'
+  }
+  maven {
+    url "$storageUrl/download.flutter.io"
+  }
 }
 
 def kotlin_version = getExtOrDefault("kotlinVersion")
@@ -79,4 +87,7 @@ dependencies {
   implementation "org.jetbrains.kotlin:kotlin-stdlib:$kotlin_version"
   annotationProcessor 'com.google.dagger:dagger-compiler:2.57.1'
   ksp 'com.google.dagger:dagger-compiler:2.57.1'
+
+  debugImplementation 'com.example.wira_flutter_module:flutter_debug:1.0'
+  releaseImplementation 'com.example.wira_flutter_module:flutter_release:1.0'
 }

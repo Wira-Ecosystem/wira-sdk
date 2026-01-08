@@ -14,6 +14,7 @@ import { getWiraConfig, initDownloadCircuits, initWiraSdk } from './config';
 import { Wallet } from './wallet';
 import { WalletCalls } from './wallet/calls';
 import { CircuitDownloadStatus } from './common/enums';
+import WiraSdk from './NativeWiraSdk';
 
 type SignInOptions = {
   registryUrl: string;
@@ -33,6 +34,15 @@ async function signIn(pin: string, registerDevice?: SignInOptions) {
       throw new Error('No user data found');
     }
     const data = await decryptVCWithPin(userData.credentials, pin);
+    const credentials = JSON.parse(
+      await WiraSdk.getCredentials(data.did, data.privKey.replace('0x', ''))
+    );
+    if (credentials?.credentials && credentials.credentials.length === 0) {
+      throw new Error('No credentials found for the user');
+    }
+
+    data.vc = credentials.credentials[0].info;
+
     if (registerDevice) {
       const sharedSession = new SharedSession(
         registerDevice.registryUrl,
@@ -45,7 +55,7 @@ async function signIn(pin: string, registerDevice?: SignInOptions) {
     if (error.message === 'No user data found') {
       throw error;
     }
-    throw new Error('Decryption failed, Invalid PIN?: ' + error.message);
+    throw new Error('Decryption failed: ' + error.message);
   }
 }
 /**

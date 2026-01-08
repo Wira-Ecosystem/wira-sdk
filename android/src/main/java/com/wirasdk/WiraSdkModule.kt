@@ -79,6 +79,23 @@ class WiraSdkModule(val reactContext: ReactApplicationContext) :
     callFunction("backupIdentity", args, promise)
   }
 
+  override fun restoreIdentity(backup: String, userDid: String, userPk: String, promise: Promise) {
+    val args = mapOf(
+      "backup" to backup,
+      "userDid" to userDid,
+      "userPk" to userPk
+    )
+    callFunction("restoreIdentity", args, promise)
+  }
+
+  override fun getCredentials(userDid: String, userPk: String, promise: Promise) {
+    val args = mapOf(
+      "userDid" to userDid,
+      "userPk" to userPk
+    )
+    callFunction("getCredentials", args, promise)
+  }
+
   companion object {
     const val NAME = "WiraSdk"
     private const val CHANNEL_NAME = "wira_logic"

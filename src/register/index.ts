@@ -200,8 +200,6 @@ export class Registerer {
       ...this.userData,
       identity: backupResponse.backup,
     };
-    console.log('User data with identity to store on server:');
-    console.log(userDataWithIdentity);
 
     const hashedDataWithIdentity = await encryptVCWithPin(
       userDataWithIdentity,

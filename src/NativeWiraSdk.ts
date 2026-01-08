@@ -11,6 +11,12 @@ export interface Spec extends TurboModule {
     userPk: string
   ): Promise<any>;
   backupIdentity(userDid: string, userPk: string): Promise<any>;
+  restoreIdentity(
+    backup: string,
+    userDid: string,
+    userPk: string
+  ): Promise<any>;
+  getCredentials(userDid: string, userPk: string): Promise<any>;
 }
 
 export default TurboModuleRegistry.getEnforcing<Spec>('WiraSdk');

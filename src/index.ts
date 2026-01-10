@@ -1,7 +1,7 @@
 import * as provision from './common/provisionClient';
 import { RegistryApi } from './register/registry';
 import idCardAnalyzer from './id-analyzer/idCardAnalyzer';
-import { Registerer, type UserData } from './register';
+import { Registerer } from './register';
 import { decryptVCWithPin, encryptVCWithPin } from './vcCrypto';
 import { EncryptionService } from './encryption';
 import { RecoveryService } from './recovery';
@@ -15,6 +15,8 @@ import { Wallet } from './wallet';
 import { WalletCalls } from './wallet/calls';
 import { CircuitDownloadStatus } from './common/enums';
 import WiraSdk from './NativeWiraSdk';
+import type { UserData } from './common/types';
+import { WiraSdkInterface } from './encryption/nativeSdk';
 
 type SignInOptions = {
   registryUrl: string;
@@ -24,16 +26,33 @@ type SignInOptions = {
 /**
  * Sign in a user with their credential and PIN.
  * @param pin - The user's PIN.
+ * @param afterCiRecovery - Flag indicating if the sign-in is after a CI+PIN recovery.
  * @param registerDevice - Optional parameters for registering the device for shared sessions.
  * @returns The decrypted user data.
  */
-async function signIn(pin: string, registerDevice?: SignInOptions) {
+async function signIn(
+  pin: string,
+  afterCiRecovery: boolean = false,
+  registerDevice?: SignInOptions
+) {
   try {
     const userData = await Storage.getUserData();
     if (!userData) {
       throw new Error('No user data found');
     }
     const data = await decryptVCWithPin(userData.credentials, pin);
+    if (afterCiRecovery) {
+      if (!data.identity) {
+        throw new Error('Identity information for recovery is missing');
+      }
+
+      await WiraSdkInterface.restoreIdentity(
+        data.identity,
+        data.did,
+        data.privKey
+      );
+    }
+
     const credentials = JSON.parse(
       await WiraSdk.getCredentials(data.did, data.privKey.replace('0x', ''))
     );
@@ -169,6 +188,7 @@ const wira = {
   checkBiometricAuth,
   checkPin,
   updatePin,
+  authenticateWithVerifier: WiraSdkInterface.authenticate,
   provision,
   RegistryApi,
   GuardiansApi,

@@ -12,20 +12,13 @@ import { Storage } from '../storage';
 import { SharedSession } from '../shared-session';
 import { Biometric } from '../biometry';
 import WiraSdk from '../NativeWiraSdk';
+import { WiraSdkInterface } from '../encryption/nativeSdk';
+import type { UserData } from '../common/types';
 
 export type WalletData = {
   address: `0x${string}`;
   salt: bigint;
   privateKey: `0x${string}`;
-};
-
-export type UserData = {
-  dni: string;
-  salt: bigint;
-  privKey: string;
-  account: `0x${string}`;
-  guardian: string | null;
-  did: string;
 };
 
 /**
@@ -182,23 +175,14 @@ export class Registerer {
       );
     }
 
-    const backupResponse = JSON.parse(
-      await WiraSdk.backupIdentity(
-        this.subjectDid,
-        this.walletData.privateKey.replace('0x', '')
-      )
+    const backup = await WiraSdkInterface.backupIdentity(
+      this.subjectDid,
+      this.walletData.privateKey
     );
-
-    if (!backupResponse.success) {
-      throw new Error(
-        'Error backing up identity: ' +
-          (backupResponse.error || 'unknown error')
-      );
-    }
 
     const userDataWithIdentity = {
       ...this.userData,
-      identity: backupResponse.backup,
+      identity: backup,
     };
 
     const hashedDataWithIdentity = await encryptVCWithPin(

@@ -40,3 +40,16 @@ export type CircuitModel = {
   circuitId: string;
   checksum: string | null;
 };
+
+export type UserData = {
+  dni: string;
+  salt: bigint;
+  privKey: `0x${string}`;
+  account: `0x${string}`;
+  guardian: string | null;
+  did: string;
+};
+
+export type UserDataWithIdentity = UserData & {
+  identity: string;
+};

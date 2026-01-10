@@ -1,6 +1,5 @@
 import { PermissionsAndroid, Platform } from 'react-native';
 import { EncryptionService } from '../encryption';
-import pako from 'pako';
 import {
   check,
   openSettings,
@@ -9,7 +8,6 @@ import {
 } from 'react-native-permissions';
 import { Alert } from 'react-native';
 import RNFS from 'react-native-fs';
-import RNQRGenerator from 'rn-qr-generator';
 import { encryptVCWithPin } from '../vcCrypto';
 import { jsonStringifyWithBigInt } from '../vcCrypto/json';
 import { DeviceId } from '../deviceId';
@@ -18,15 +16,25 @@ import { Storage } from '../storage';
 import { RegistryApi } from '../register/registry';
 import { Biometric } from '../biometry';
 import { SharedSession } from '../shared-session';
+import { WiraSdkInterface } from '../encryption/nativeSdk';
+import type { UserData, UserDataWithIdentity } from '../common/types';
+import { pick, types } from '@react-native-documents/picker';
 
 export class RecoveryService {
-  async saveQrData(
-    data: any,
+  async saveBackupData(
+    data: UserDataWithIdentity,
     pin: string,
     sharedSessionSchema: string,
     registryUrl: string
   ) {
-    const encryptedCredential = await encryptVCWithPin(data, pin);
+    const { identity, ...rawData } = data;
+    const rawDataWithIdentity = { ...rawData, identity };
+
+    const hashedData = await encryptVCWithPin(rawData, pin);
+    const hashedDataWithIdentity = await encryptVCWithPin(
+      rawDataWithIdentity,
+      pin
+    );
 
     const encryptService = new EncryptionService();
     const registryApi = new RegistryApi(registryUrl);
@@ -34,8 +42,8 @@ export class RecoveryService {
 
     await encryptService.connect();
     const encryptedData = await encryptService.encryptData({
-      hashedData: encryptedCredential,
-      rawData: data,
+      hashedData: hashedDataWithIdentity,
+      rawData: rawDataWithIdentity,
     });
     encryptService.litNodeClient.disconnect();
 
@@ -49,13 +57,16 @@ export class RecoveryService {
       throw new Error('Failed to update data on server');
     }
 
-    await sharedSession.registerSharedSessionDevice(data.dni, pin, data);
+    await sharedSession.registerSharedSessionDevice(
+      data.dni,
+      pin,
+      rawDataWithIdentity
+    );
 
-    const useBiometry = await Biometric.getBioFlag();
-    if (useBiometry) {
-      await Storage.saveUserDataWithBiometric(data);
-    }
-    await Storage.saveUserData(encryptedCredential);
+    await WiraSdkInterface.restoreIdentity(identity, data.did, data.privKey);
+    await Biometric.setBioFlag(false);
+    await Storage.deleteBiometricData();
+    await Storage.saveUserData(hashedData);
   }
 
   async recoveryAndSave(
@@ -94,38 +105,19 @@ export class RecoveryService {
     await Storage.saveUserData(response.data);
   }
 
-  prepareQrData(data: object) {
-    return Buffer.from(pako.deflate(jsonStringifyWithBigInt(data))).toString(
-      'base64'
-    );
-  }
-
-  decompressQrData(data: string) {
-    return JSON.parse(
-      pako.inflate(Buffer.from(data, 'base64'), { to: 'string' })
-    );
-  }
-
-  async requestGalleryPermission() {
+  async requestStoragePermission() {
     if (Platform.OS !== 'android') return true;
 
     const androidVersion =
       typeof Platform.Version === 'number' ? Platform.Version : 0;
 
-    // Android 13+ - Permisos específicos de media
+    // Android 13+ usa scoped storage para archivos no multimedia, por lo que no
+    // expone un permiso específico para JSON/descargas. Mantener la llamada limpia
+    // y confiar en las rutas soportadas (Downloads/DocumentDirectory, SAF, etc.).
     if (androidVersion >= 33) {
-      const permission = PermissionsAndroid.PERMISSIONS.READ_MEDIA_IMAGES;
-      const status = await check(permission);
-      if (status === RESULTS.GRANTED) return true;
-
-      const granted = await request(permission, {
-        title: 'Permiso para galería',
-        message: 'Necesitamos acceso para guardar el QR en tu galería.',
-        buttonPositive: 'OK',
-      });
-
-      return granted === RESULTS.GRANTED;
+      return true;
     }
+
     // Android 10-12 (API 29-32) - Caso especial para Huawei/EMUI
     // Necesita WRITE_EXTERNAL_STORAGE y posiblemente READ también
     if (androidVersion >= 29) {
@@ -172,7 +164,7 @@ export class RecoveryService {
         // Si aún no están otorgados, mostrar alerta
         Alert.alert(
           'Permiso necesario',
-          'Para guardar el QR en tu dispositivo, necesitamos acceso al almacenamiento.\n\nPor favor, habilita el permiso en Configuración.',
+          'Para guardar el archivo en tu dispositivo, necesitamos acceso al almacenamiento.\n\nPor favor, habilita el permiso en Configuración.',
           [
             { text: 'Abrir configuración', onPress: () => openSettings() },
             { text: 'Cancelar', style: 'cancel' },
@@ -190,8 +182,9 @@ export class RecoveryService {
     if (status === RESULTS.GRANTED) return true;
 
     const granted = await request(permission, {
-      title: 'Permiso para galería',
-      message: 'Necesitamos acceso para guardar el QR en tu galería.',
+      title: 'Permiso para almacenamiento',
+      message:
+        'Necesitamos acceso para guardar el archivo de respaldo en tu dispositivo.',
       buttonPositive: 'OK',
     });
 
@@ -199,7 +192,7 @@ export class RecoveryService {
 
     Alert.alert(
       'Permiso denegado',
-      'Para guardar en la galería, habilita el permiso en Configuración > Permisos',
+      'Para guardar en el dispositivo, habilita el permiso en Configuración > Permisos',
       [
         { text: 'Abrir configuración', onPress: () => openSettings() },
         { text: 'OK' },
@@ -241,37 +234,61 @@ export class RecoveryService {
     }
   }
 
-  async saveQrOnDevice(b64Data: string) {
-    const fileName = `QR_Recovery_${Date.now()}.png`;
+  async backupDataOnDevice(data: UserData) {
+    const backup = await WiraSdkInterface.backupIdentity(
+      data.did,
+      data.privKey
+    );
+
+    const dataToBackup = {
+      ...data,
+      identity: backup,
+    };
+    const fileName = `Backup_${Date.now()}.json`;
+    const jsonPayload = jsonStringifyWithBigInt(dataToBackup);
+
+    if (Platform.OS === 'android') {
+      const hasPermission = await this.requestStoragePermission();
+      if (!hasPermission) {
+        throw new Error('Storage permission not granted');
+      }
+    }
 
     try {
-      const path = await this.saveToGallery(b64Data, fileName);
-      return { savedOn: 'gallery', path, fileName };
-    } catch (galleryError) {
-      try {
-        const downloadPath = `${RNFS.DownloadDirectoryPath}/${fileName}`;
-        const path = await RNFS.writeFile(downloadPath, b64Data, 'base64');
-        return { savedOn: 'downloads', path, fileName };
-      } catch (downloadError) {
-        // Último recurso: directorio interno
-        const internalPath = `${RNFS.DocumentDirectoryPath}/${fileName}`;
-        const path = await RNFS.writeFile(internalPath, b64Data, 'base64');
-        return { savedOn: 'internal', path, fileName };
-      }
+      const downloadPath = `${RNFS.DownloadDirectoryPath}/${fileName}`;
+      await RNFS.writeFile(downloadPath, jsonPayload, 'utf8');
+      return { savedOn: 'downloads', path: downloadPath, fileName };
+    } catch (downloadError) {
+      // Último recurso: directorio interno
+      const internalPath = `${RNFS.DocumentDirectoryPath}/${fileName}`;
+      await RNFS.writeFile(internalPath, jsonPayload, 'utf8');
+      return { savedOn: 'internal', path: internalPath, fileName };
     }
   }
 
-  async recoveryFromQr(imageUri: string) {
-    const { values } = await RNQRGenerator.detect({ uri: imageUri });
-
-    if (!values?.length || !values[0]) {
-      throw new Error('No pude leer un QR válido');
+  async recoveryFromBackup() {
+    if (Platform.OS === 'android') {
+      const hasPermission = await this.requestStoragePermission();
+      if (!hasPermission) {
+        throw new Error('Storage permission not granted');
+      }
     }
 
-    const data = this.decompressQrData(values[0]);
+    let pickedPath: string;
+    try {
+      const [{ uri }] = await pick({
+        type: types.json,
+      });
 
-    const required = ['dni', 'salt', 'privKey', 'account', 'did'];
+      pickedPath = uri;
+    } catch (err) {
+      throw new Error('Select file error: ' + err);
+    }
 
+    const raw = await RNFS.readFile(pickedPath, 'utf8');
+    const data = JSON.parse(raw);
+
+    const required = ['dni', 'salt', 'privKey', 'account', 'did', 'identity'];
     const missing = required.filter((f) => !data[f]);
     if (missing.length) {
       throw new Error(`Faltan campos: ${missing.join(', ')}`);
@@ -304,14 +321,17 @@ export class RecoveryService {
   }
 
   async saveRecoveryDataFromGuardians(
-    data: any,
+    data: UserDataWithIdentity,
     pin: string,
     registryUrl: string,
     sharedSessionSchema: string
   ) {
     const sharedSession = new SharedSession(registryUrl, sharedSessionSchema);
+    const { identity, ...rawData } = data;
 
-    const encryptedWithNewPin = await encryptVCWithPin(data, pin);
+    await WiraSdkInterface.restoreIdentity(identity, data.did, data.privKey);
+
+    const encryptedWithNewPin = await encryptVCWithPin(rawData, pin);
     await sharedSession.registerSharedSessionDevice(data.dni, pin, data);
 
     const useBiometry = await Biometric.getBioFlag();

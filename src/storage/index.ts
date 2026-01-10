@@ -1,8 +1,8 @@
 import Keychain, { hasGenericPassword } from 'react-native-keychain';
 import { BIO_SERVICE, KEY_SERVICE, KEY_USERNAME } from '../common/constants';
-import type { UserData } from '../register';
 import { jsonStringifyWithBigInt } from '../vcCrypto/json';
 import { Platform } from 'react-native';
+import type { UserData } from '../common/types';
 
 /**
  * Checks if user data is stored locally.

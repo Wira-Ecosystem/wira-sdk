@@ -8,6 +8,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SALT } from '../common/constants';
 import { Storage } from '../storage';
 import { Biometric } from '../biometry';
+import { WiraSdkInterface } from '../encryption/nativeSdk';
 
 export class SharedSession {
   api: AuthApi;
@@ -136,15 +137,17 @@ export class SharedSession {
       throw new Error('Failed to get session: ' + response.error);
     }
     const data = await decryptVCWithPin(response.session, `${deviceId}:${pin}`);
+    const { identity, ...dataWithoutIdentity } = data;
 
-    const encryptedData = await encryptVCWithPin(data, pin);
+    const encryptedData = await encryptVCWithPin(dataWithoutIdentity, pin);
     await this.registerSharedSessionDevice(data.dni, pin, data);
 
+    await WiraSdkInterface.restoreIdentity(identity, data.did, data.privKey);
     const useBiometry = await Biometric.getBioFlag();
     if (useBiometry) {
-      await Storage.saveUserDataWithBiometric(data);
+      await Storage.saveUserDataWithBiometric(dataWithoutIdentity);
     }
     await Storage.saveUserData(encryptedData);
-    return data;
+    return dataWithoutIdentity;
   }
 }

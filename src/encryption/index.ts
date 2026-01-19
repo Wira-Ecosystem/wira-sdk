@@ -59,8 +59,8 @@ if (typeof global.Event === 'undefined') {
 export class EncryptionService {
   litNodeClient;
   ethersWallet;
-  ciAction = 'QmZ1HpjTQQmtK5H9PKnoXk44ZpEM3CPADUmu7MSZnEdWAJ'; //'QmfXEe95qUxbrC6nEYHWTcQTaHa2gNpKkHpWxUZ7KAbPyF';
-  guardianAction = 'QmXTy5kwFsyfuTVi2ZY9tFTg9cvk4TRZba95RRxmsYyEyh'; //'QmZixSn2CSdS3zxMs3TGp6zfDjp1kFEQqx6HoRXvo84VCC';
+  ciAction = 'QmfXEe95qUxbrC6nEYHWTcQTaHa2gNpKkHpWxUZ7KAbPyF';
+  guardianAction = 'QmZixSn2CSdS3zxMs3TGp6zfDjp1kFEQqx6HoRXvo84VCC';
 
   // Example access control condition: only allow decryption if the user has signed a message with a specific IPFS ID
   accessControlConditions = [

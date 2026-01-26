@@ -73,10 +73,20 @@ repositories {
   mavenCentral()
   google()
   maven {
-    url '/media/john/IdeaSpace/Workspace/zk-login/flutter/wira_flutter_module/build/host/outputs/repo'
+    url '/media/john/IdeaSpace1/Workspace/zk-login/flutter/wira_flutter_module/build/host/outputs/repo'
   }
   maven {
     url "$storageUrl/download.flutter.io"
+  }
+}
+
+// Map the legacy package_info_plus coordinates to the actual published group in the local Flutter repo.
+configurations.all { config ->
+  config.resolutionStrategy.eachDependency { details ->
+    if (details.requested.group == 'io.flutter.plugins.packageinfo' &&
+        details.requested.name == 'package_info_plus_release') {
+      details.useTarget('dev.fluttercommunity.plus.packageinfo:package_info_plus_release:1.0')
+    }
   }
 }
 

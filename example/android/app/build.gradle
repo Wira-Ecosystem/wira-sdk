@@ -76,7 +76,7 @@ String storageUrl = System.env.FLUTTER_STORAGE_BASE_URL ?: "https://storage.goog
 
 repositories {
     maven {
-        url '/media/john/IdeaSpace/Workspace/zk-login/flutter/wira_flutter_module/build/host/outputs/repo'
+        url '/media/john/IdeaSpace1/Workspace/zk-login/flutter/wira_flutter_module/build/host/outputs/repo'
     }
     maven {
         url "$storageUrl/download.flutter.io"

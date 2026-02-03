@@ -1,8 +1,8 @@
-import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import axios from 'axios';
 import { Platform } from 'react-native';
-import { STORAGE_KEY } from './constants';
 import { jsonStringifyWithBigInt } from '../vcCrypto/json';
+import { STORAGE_KEY } from './constants';
 
 export type Provision = {
   mock?: boolean;
@@ -43,5 +43,17 @@ export async function ensureProvisioned({
   mock = true,
   gatewayBase,
 }: Provision) {
-  return fetchProvision({ mock, gatewayBase });
+  try {
+    return await fetchProvision({ mock, gatewayBase });
+  } catch (error: any) {
+    const savedData = await getProvision();
+    if (!savedData) {
+      throw new Error(
+        'Provisioning failed and no saved provision data found: ' +
+          error.message
+      );
+    }
+
+    return savedData;
+  }
 }

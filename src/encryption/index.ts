@@ -88,8 +88,8 @@ export class EncryptionService {
   litNodeClient?: NagaLitClient;
   authManager: ReturnType<typeof createAuthManager>;
   ethersWallet;
-  ciAction = 'QmdSG44iLviHEdSCsdtyaZfPsddbd5HgP67NNLQ2buvyVn'; //'QmQJMa2V5ozRD13LdaRiDdFdJQnjvbC4tmG16r3Y5UXzPy';
-  guardianAction = 'QmSR48uxLVngB6qSXu4AJKjbiQ3c3vfR9pDGypfgZFX93d'; //'QmbfDNUvNzPVi8HvL3xSWHrJCb4BMGFi8wMPaU48PuXdiv';
+  ciAction = 'QmQJMa2V5ozRD13LdaRiDdFdJQnjvbC4tmG16r3Y5UXzPy'; // Dev: 'QmdSG44iLviHEdSCsdtyaZfPsddbd5HgP67NNLQ2buvyVn';
+  guardianAction = 'QmbfDNUvNzPVi8HvL3xSWHrJCb4BMGFi8wMPaU48PuXdiv'; // Dev: 'QmSR48uxLVngB6qSXu4AJKjbiQ3c3vfR9pDGypfgZFX93d';
 
   // Example access control condition: only allow decryption if the user has signed a message with a specific IPFS ID
   accessControlConditions: UnifiedAccessControlCondition[] = [

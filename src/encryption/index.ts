@@ -1,18 +1,15 @@
-import { LIT_ABILITY, LIT_NETWORK } from '@lit-protocol/constants';
-import { LitNodeClient } from '@lit-protocol/lit-node-client';
-import { encryptString } from '@lit-protocol/encryption';
-import { Wallet } from 'ethers';
 import RNFS from 'react-native-fs';
-import {
-  createSiweMessage,
-  generateAuthSig,
-  LitActionResource,
-} from '@lit-protocol/auth-helpers';
+import '../polyfills/customEvent';
 import { discoverableHashFromDni } from '../register/idHash';
 import { getProvision } from '../common/provisionClient';
 import { jsonStringifyWithBigInt } from '../vcCrypto/json';
+import { createLitClient, type NagaLitClient } from '@lit-protocol/lit-client';
+import { nagaDev } from '@lit-protocol/networks';
+import { type UnifiedAccessControlCondition } from '@lit-protocol/access-control-conditions-schemas';
+import { createAuthManager } from '@lit-protocol/auth';
+import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts';
 
-// Polyfill for global document and Event in React Native
+// Polyfill for global document in React Native
 if (typeof global.document === 'undefined') {
   global.document = {
     createElement: () => {
@@ -42,29 +39,62 @@ if (!window.location) {
   };
 }
 
-if (typeof global.Event === 'undefined') {
-  (global as any).Event = class Event {
-    type: any;
-    bubbles: any;
-    cancelable: any;
+class InMemoryStorage {
+  private storage: Map<string, any>;
 
-    constructor(type: any, options: any = {}) {
-      this.type = type;
-      this.bubbles = options.bubbles || false;
-      this.cancelable = options.cancelable || false;
-    }
-  };
+  constructor() {
+    this.storage = new Map();
+  }
+
+  config() {}
+
+  async write({ address, authData }: { address: string; authData: any }) {
+    this.storage.set(`lit-auth:${address}`, authData);
+  }
+  async read({ address }: { address: string }) {
+    return this.storage.get(`lit-auth:${address}`);
+  }
+  async writeInnerDelegationAuthSig({
+    publicKey,
+    authSig,
+  }: {
+    publicKey: string;
+    authSig: string;
+  }) {
+    this.storage.set(`lit-delegation:${publicKey}`, authSig);
+  }
+  async readInnerDelegationAuthSig({ publicKey }: { publicKey: string }) {
+    return this.storage.get(`lit-delegation:${publicKey}`);
+  }
+  async writePKPTokens(params: {
+    authMethodType: number | bigint;
+    authMethodId: string;
+    tokenIds: string[];
+  }) {
+    const key = `lit-pkp-tokens:${params.authMethodType}:${params.authMethodId}`;
+    this.storage.set(key, JSON.stringify(params.tokenIds));
+  }
+  async readPKPTokens(params: {
+    authMethodType: number | bigint;
+    authMethodId: string;
+  }) {
+    const key = `lit-pkp-tokens:${params.authMethodType}:${params.authMethodId}`;
+    const data = this.storage.get(key);
+    return data ? (JSON.parse(data) as string[]) : null;
+  }
 }
 
 export class EncryptionService {
-  litNodeClient;
+  litNodeClient?: NagaLitClient;
+  authManager: ReturnType<typeof createAuthManager>;
   ethersWallet;
-  ciAction = 'QmZ1HpjTQQmtK5H9PKnoXk44ZpEM3CPADUmu7MSZnEdWAJ'; //'QmfXEe95qUxbrC6nEYHWTcQTaHa2gNpKkHpWxUZ7KAbPyF';
-  guardianAction = 'QmXTy5kwFsyfuTVi2ZY9tFTg9cvk4TRZba95RRxmsYyEyh'; //'QmZixSn2CSdS3zxMs3TGp6zfDjp1kFEQqx6HoRXvo84VCC';
+  ciAction = 'QmdSG44iLviHEdSCsdtyaZfPsddbd5HgP67NNLQ2buvyVn'; //'QmQJMa2V5ozRD13LdaRiDdFdJQnjvbC4tmG16r3Y5UXzPy';
+  guardianAction = 'QmSR48uxLVngB6qSXu4AJKjbiQ3c3vfR9pDGypfgZFX93d'; //'QmbfDNUvNzPVi8HvL3xSWHrJCb4BMGFi8wMPaU48PuXdiv';
 
   // Example access control condition: only allow decryption if the user has signed a message with a specific IPFS ID
-  accessControlConditions = [
+  accessControlConditions: UnifiedAccessControlCondition[] = [
     {
+      conditionType: 'evmBasic',
       contractAddress: '',
       standardContractType: '',
       chain: 'ethereum',
@@ -77,6 +107,7 @@ export class EncryptionService {
     },
     { operator: 'or' },
     {
+      conditionType: 'evmBasic',
       contractAddress: '',
       standardContractType: '',
       chain: 'ethereum',
@@ -90,18 +121,17 @@ export class EncryptionService {
   ];
 
   constructor() {
-    // Initialize LitNodeClient and ethers wallet
-    this.litNodeClient = new LitNodeClient({
-      litNetwork: LIT_NETWORK.DatilDev,
-      debug: true,
-      connectTimeout: 60000,
+    this.ethersWallet = privateKeyToAccount(generatePrivateKey());
+    this.authManager = createAuthManager({
+      storage: new InMemoryStorage(),
     });
-    this.ethersWallet = Wallet.createRandom();
   }
 
   // Connect to the Lit network
   async connect() {
-    await this.litNodeClient.connect();
+    this.litNodeClient = await createLitClient({
+      network: nagaDev,
+    });
   }
 
   // Convert image file to base64 string, this will be used for convert CI images
@@ -116,13 +146,14 @@ export class EncryptionService {
 
   // Encrypt data with an Access Control Condition
   async encryptData(object: Object) {
-    return encryptString(
-      {
-        dataToEncrypt: jsonStringifyWithBigInt(object),
-        accessControlConditions: this.accessControlConditions,
-      },
-      this.litNodeClient
-    );
+    if (!this.litNodeClient) {
+      throw new Error('Lit Node Client is not connected.');
+    }
+
+    return this.litNodeClient.encrypt({
+      dataToEncrypt: jsonStringifyWithBigInt(object),
+      unifiedAccessControlConditions: this.accessControlConditions,
+    });
   }
 
   // Decrypt data using CI images and CI number
@@ -131,7 +162,11 @@ export class EncryptionService {
     backImg: string,
     selfieImg: string,
     CI: string
-  ) {
+  ): Promise<any> {
+    if (!this.litNodeClient) {
+      throw new Error('Lit Node Client is not connected.');
+    }
+
     const prov = await getProvision();
     const apiKey = prov?.gemini?.apiKey;
 
@@ -144,7 +179,7 @@ export class EncryptionService {
 
     const response = await this.litNodeClient.executeJs({
       ipfsId: this.ciAction,
-      sessionSigs,
+      authContext: sessionSigs,
       jsParams: {
         accessControlConditions: this.accessControlConditions,
         apiKey,
@@ -159,13 +194,20 @@ export class EncryptionService {
   }
 
   // Decrypt data using Guardian (not implemented yet)
-  async decryptDataWithGuardian(dniHash: string, deviceId: string) {
+  async decryptDataWithGuardian(
+    dniHash: string,
+    deviceId: string
+  ): Promise<any> {
+    if (!this.litNodeClient) {
+      throw new Error('Lit Node Client is not connected.');
+    }
+
     // Get session signatures from Lit nodes to let wallet use the Lit network
     const sessionSigs = await this.getSessionSigns();
 
     const response = await this.litNodeClient.executeJs({
       ipfsId: this.guardianAction,
-      sessionSigs,
+      authContext: sessionSigs,
       jsParams: {
         accessControlConditions: this.accessControlConditions,
         dniHash,
@@ -176,35 +218,20 @@ export class EncryptionService {
     return response;
   }
 
-  async getSessionSigns() {
-    return this.litNodeClient.getSessionSigs({
-      chain: 'ethereum',
-      expiration: new Date(Date.now() + 1000 * 60 * 5).toISOString(), // 5 minutes
-      resourceAbilityRequests: [
-        {
-          resource: new LitActionResource('*'),
-          ability: LIT_ABILITY.LitActionExecution,
-        },
-      ],
-      authNeededCallback: async ({
-        uri,
-        expiration,
-        resourceAbilityRequests,
-      }) => {
-        const toSign = await createSiweMessage({
-          uri,
-          expiration,
-          resources: resourceAbilityRequests,
-          walletAddress: this.ethersWallet.address,
-          nonce: await this.litNodeClient.getLatestBlockhash(),
-          litNodeClient: this.litNodeClient,
-        });
+  async getSessionSigns(): Promise<any> {
+    if (!this.litNodeClient) {
+      throw new Error('Lit Node Client is not connected.');
+    }
 
-        return await generateAuthSig({
-          signer: this.ethersWallet,
-          toSign,
-        });
+    return this.authManager.createEoaAuthContext({
+      config: { account: this.ethersWallet },
+      authConfig: {
+        expiration: new Date(Date.now() + 1000 * 60 * 5).toISOString(), // 5 minutes
+        domain: 'wira.com',
+        statement: 'Authenticate to Wira SDK',
+        resources: [['lit-action-execution', '*']],
       },
+      litClient: this.litNodeClient,
     });
   }
 }

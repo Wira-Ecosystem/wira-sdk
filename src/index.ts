@@ -169,7 +169,7 @@ async function updatePin(registryUrl: string, oldPin: string, newPin: string) {
     hashedData: encryptedWithNewPin,
     rawData: decryptedData,
   });
-  encryptService.litNodeClient.disconnect();
+  encryptService.litNodeClient?.disconnect();
   const registerResponse = await registryApi.updateRecoveryData(
     decryptedData.dni,
     encryptedData.ciphertext,

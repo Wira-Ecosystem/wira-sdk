@@ -167,20 +167,21 @@
   },
   "dependencies": {
     "@google/genai": "^1.21.0",
-    "@lit-protocol/encryption": "^7.3.1",
-    "@lit-protocol/lit-node-client": "^7.3.1",
+    "@lit-protocol/auth": "^8.2.3",
+    "@lit-protocol/lit-client": "^8.3.1",
+    "@lit-protocol/networks": "^8.4.1",
     "@noble/hashes": "^2.0.1",
     "@react-native-async-storage/async-storage": "^2.2.0",
     "@walletconnect/modal": "^2.7.0",
     "axios": "^1.12.2",
-    "bs58": "^6.0.0",
+    "i": "^0.3.7",
+    "npm": "^11.8.0",
     "permissionless": "^0.2.57",
     "react-native-biometrics": "^3.0.1",
     "react-native-fs": "^2.20.0",
     "react-native-keychain": "^10.0.0",
     "react-native-permissions": "^5.4.2",
     "react-native-quick-crypto": "^0.7.17",
-    "rn-qr-generator": "^1.4.4",
     "viem": "^2.37.9"
   }
 }

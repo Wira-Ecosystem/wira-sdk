@@ -195,7 +195,7 @@ export class Registerer {
       hashedData: hashedDataWithIdentity,
       rawData: userDataWithIdentity,
     });
-    this.encryptService.litNodeClient.disconnect();
+    this.encryptService.litNodeClient?.disconnect();
 
     const response = await this.registryApi.registryRegister({
       did: this.subjectDid,

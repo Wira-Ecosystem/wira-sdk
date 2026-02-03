@@ -45,7 +45,7 @@ export class RecoveryService {
       hashedData: hashedDataWithIdentity,
       rawData: rawDataWithIdentity,
     });
-    encryptService.litNodeClient.disconnect();
+    encryptService.litNodeClient?.disconnect();
 
     const registerResponse = await registryApi.updateRecoveryData(
       data.dni,
@@ -91,7 +91,7 @@ export class RecoveryService {
       selfieBase,
       dni
     );
-    encryptionService.litNodeClient.disconnect();
+    encryptionService.litNodeClient?.disconnect();
 
     if (!encryptedData.success) {
       throw new Error('LIT Decryption failed');
@@ -306,7 +306,7 @@ export class RecoveryService {
       discoverableHashFromDni(dni),
       deviceId
     );
-    encryptionService.litNodeClient.disconnect();
+    encryptionService.litNodeClient?.disconnect();
 
     if (!data.success) {
       throw new Error('Decryption failed');

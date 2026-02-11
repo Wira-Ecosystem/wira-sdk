@@ -14,6 +14,7 @@ import { Biometric } from '../biometry';
 import WiraSdk from '../NativeWiraSdk';
 import { WiraSdkInterface } from '../encryption/nativeSdk';
 import type { UserData } from '../common/types';
+import { jsonStringifyWithBigInt } from '../vcCrypto/json';
 
 export type WalletData = {
   address: `0x${string}`;
@@ -190,22 +191,14 @@ export class Registerer {
       this.pin
     );
 
-    await this.encryptService.connect();
-    const encryptedData = await this.encryptService.encryptData({
-      hashedData: hashedDataWithIdentity,
-      rawData: userDataWithIdentity,
-    });
-    this.encryptService.litNodeClient?.disconnect();
-
     const response = await this.registryApi.registryRegister({
       did: this.subjectDid,
       accountAddress: this.userData.account,
       guardianContractAddress: this.guardianAddress,
       displayNamePublic: null,
-      discoverableHashOptIn: true, // opt-in
       dni: this.dni,
-      ciphertext: encryptedData.ciphertext,
-      dataToEncryptHash: encryptedData.dataToEncryptHash,
+      hashedDataWithIdentity,
+      userDataWithIdentity: jsonStringifyWithBigInt(userDataWithIdentity),
     });
 
     await this.sharedSession.registerSharedSessionDevice(

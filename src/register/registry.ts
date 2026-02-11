@@ -6,10 +6,9 @@ export type RegistryInput = {
   accountAddress: `0x${string}`;
   guardianContractAddress?: `0x${string}` | null;
   displayNamePublic: boolean | null;
-  discoverableHashOptIn: boolean; // opt-in
   dni: string;
-  ciphertext: string; //for recovery purposes
-  dataToEncryptHash: string; //for recovery purposes
+  hashedDataWithIdentity: string; //for recovery purposes
+  userDataWithIdentity: string; //for recovery purposes
 };
 
 export class RegistryApi {
@@ -55,19 +54,17 @@ export class RegistryApi {
   }
 
   async registryRegister(input: RegistryInput) {
-    const payload: Omit<RegistryInput, 'discoverableHashOptIn' | 'dni'> & {
+    const payload: Omit<RegistryInput, 'dni'> & {
       discoverableHash?: string;
     } = {
       did: input.did,
       accountAddress: input.accountAddress,
       guardianContractAddress: input.guardianContractAddress ?? null,
+      discoverableHash: discoverableHashFromDni(input.dni),
       displayNamePublic: input.displayNamePublic ?? null,
-      ciphertext: input.ciphertext,
-      dataToEncryptHash: input.dataToEncryptHash,
+      hashedDataWithIdentity: input.hashedDataWithIdentity,
+      userDataWithIdentity: input.userDataWithIdentity,
     };
-    if (input.discoverableHashOptIn && input.dni) {
-      payload.discoverableHash = discoverableHashFromDni(input.dni);
-    }
     const { data } = await this.API.post('/registry/register', payload);
     // { ok:true, id: <streamId> }
     return data;
@@ -83,13 +80,36 @@ export class RegistryApi {
 
   async updateRecoveryData(
     dni: string,
-    ciphertext: string,
-    dataToEncryptHash: string
+    hashedDataWithIdentity: string,
+    userDataWithIdentity: string
   ) {
     const { data } = await this.API.patch('/registry/recovery', {
       discoverableHash: discoverableHashFromDni(dni),
-      ciphertext,
-      dataToEncryptHash,
+      hashedDataWithIdentity,
+      userDataWithIdentity,
+    });
+    return data;
+  }
+
+  async recoveryByCi(
+    discoverableHash: string,
+    frontImg: string,
+    backImg: string,
+    selfieImg: string
+  ) {
+    const { data } = await this.API.post('/registry/recovery-ci', {
+      discoverableHash,
+      frontImg,
+      backImg,
+      selfieImg,
+    });
+    return data;
+  }
+
+  async recoveryByGuardians(dniHash: string, deviceId: string) {
+    const { data } = await this.API.post('/registry/recovery-guardian', {
+      discoverableHash: dniHash,
+      deviceId,
     });
     return data;
   }

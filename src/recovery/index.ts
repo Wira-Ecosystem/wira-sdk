@@ -36,21 +36,13 @@ export class RecoveryService {
       pin
     );
 
-    const encryptService = new EncryptionService();
     const registryApi = new RegistryApi(registryUrl);
     const sharedSession = new SharedSession(registryUrl, sharedSessionSchema);
 
-    await encryptService.connect();
-    const encryptedData = await encryptService.encryptData({
-      hashedData: hashedDataWithIdentity,
-      rawData: rawDataWithIdentity,
-    });
-    encryptService.litNodeClient?.disconnect();
-
     const registerResponse = await registryApi.updateRecoveryData(
       data.dni,
-      encryptedData.ciphertext,
-      encryptedData.dataToEncryptHash
+      hashedDataWithIdentity,
+      jsonStringifyWithBigInt(rawDataWithIdentity)
     );
 
     if (!registerResponse.ok) {
@@ -70,6 +62,7 @@ export class RecoveryService {
   }
 
   async recoveryAndSave(
+    registryUrl: string,
     frontImage: any,
     backImage: any,
     selfieImage: any,
@@ -85,19 +78,20 @@ export class RecoveryService {
 
     await encryptionService.connect();
 
-    const encryptedData = await encryptionService.decryptDataWithCI(
+    const registryApi = new RegistryApi(registryUrl);
+
+    const { ok, data } = await registryApi.recoveryByCi(
+      discoverableHashFromDni(dni),
       frontBase,
       backBase,
-      selfieBase,
-      dni
+      selfieBase
     );
-    encryptionService.litNodeClient?.disconnect();
 
-    if (!encryptedData.success) {
-      throw new Error('LIT Decryption failed');
+    if (!ok || !data.success) {
+      throw new Error('LIT Decryption failed: ' + data.details);
     }
 
-    const response = JSON.parse(encryptedData.response as string);
+    const response = JSON.parse(data.response as string);
     if (!response.success) {
       throw new Error('Data recovery failed: ' + response.error);
     }
@@ -297,18 +291,17 @@ export class RecoveryService {
     return data;
   }
 
-  async recoveryFromGuardians(dni: string) {
-    const encryptionService = new EncryptionService();
-    await encryptionService.connect();
-
+  async recoveryFromGuardians(registryUrl: string, dni: string) {
     const deviceId = await DeviceId.getDeviceId();
-    const data = await encryptionService.decryptDataWithGuardian(
+    const registryApi = new RegistryApi(registryUrl);
+
+    const { ok, data } = await registryApi.recoveryByGuardians(
       discoverableHashFromDni(dni),
       deviceId
     );
-    encryptionService.litNodeClient?.disconnect();
+    console.log('Decryption attempt finished: ', data);
 
-    if (!data.success) {
+    if (!ok || !data.success) {
       throw new Error('Decryption failed');
     }
 

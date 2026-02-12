@@ -1,5 +1,4 @@
 import { PermissionsAndroid, Platform } from 'react-native';
-import { EncryptionService } from '../encryption';
 import {
   check,
   openSettings,
@@ -70,13 +69,9 @@ export class RecoveryService {
   ) {
     await Storage.deleteBiometricData();
 
-    const encryptionService = new EncryptionService();
-
-    const frontBase = await encryptionService.imageToBase64(frontImage.uri);
-    const backBase = await encryptionService.imageToBase64(backImage.uri);
-    const selfieBase = await encryptionService.imageToBase64(selfieImage.uri);
-
-    await encryptionService.connect();
+    const frontBase = await this.imageToBase64(frontImage.uri);
+    const backBase = await this.imageToBase64(backImage.uri);
+    const selfieBase = await this.imageToBase64(selfieImage.uri);
 
     const registryApi = new RegistryApi(registryUrl);
 
@@ -332,5 +327,15 @@ export class RecoveryService {
       await Storage.saveUserDataWithBiometric(data);
     }
     await Storage.saveUserData(encryptedWithNewPin);
+  }
+
+  // Convert image file to base64 string, this will be used for convert CI images
+  async imageToBase64(imagePath: string) {
+    try {
+      const base64 = await RNFS.readFile(imagePath, 'base64');
+      return base64;
+    } catch (error: any) {
+      throw new Error('Failed to convert image to base64: ' + error.message);
+    }
   }
 }

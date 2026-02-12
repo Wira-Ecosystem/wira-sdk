@@ -3,7 +3,6 @@ import { RegistryApi } from './register/registry';
 import idCardAnalyzer from './id-analyzer/idCardAnalyzer';
 import { Registerer } from './register';
 import { decryptVCWithPin, encryptVCWithPin } from './vcCrypto';
-import { EncryptionService } from './encryption';
 import { RecoveryService } from './recovery';
 import { GuardiansApi } from './api/guardians';
 import { DeviceId } from './deviceId';
@@ -162,18 +161,11 @@ async function updatePin(registryUrl: string, oldPin: string, newPin: string) {
   const encryptedWithNewPin = await encryptVCWithPin(decryptedData, newPin);
   await Storage.saveUserData(encryptedWithNewPin);
 
-  const encryptService = new EncryptionService();
   const registryApi = new RegistryApi(registryUrl);
-  await encryptService.connect();
-  const encryptedData = await encryptService.encryptData({
-    hashedData: encryptedWithNewPin,
-    rawData: decryptedData,
-  });
-  encryptService.litNodeClient?.disconnect();
   const registerResponse = await registryApi.updateRecoveryData(
     decryptedData.dni,
-    encryptedData.ciphertext,
-    encryptedData.dataToEncryptHash
+    encryptedWithNewPin,
+    decryptedData
   );
   if (!registerResponse.ok) {
     throw new Error('Failed to update data on server');
@@ -194,7 +186,6 @@ const wira = {
   GuardiansApi,
   idCardAnalyzer,
   Registerer,
-  EncryptionService,
   RecoveryService,
   DeviceId,
   Biometric,

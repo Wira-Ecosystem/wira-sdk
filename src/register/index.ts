@@ -7,7 +7,6 @@ import {
 } from './issuerClient';
 import { RegistryApi } from './registry';
 import { encryptVCWithPin } from '../vcCrypto';
-import { EncryptionService } from '../encryption';
 import { Storage } from '../storage';
 import { SharedSession } from '../shared-session';
 import { Biometric } from '../biometry';
@@ -36,7 +35,6 @@ export class Registerer {
   registryApi: RegistryApi;
   sharedSession: SharedSession;
   bundler: string;
-  encryptService: EncryptionService;
   userData: UserData | null = null;
   encryptedUserData: string | null = null;
   arbitrumSponsorshipPolicyId: string | undefined = undefined;
@@ -56,7 +54,6 @@ export class Registerer {
     this.registryApi = new RegistryApi(registryUrl);
     this.sharedSession = new SharedSession(registryUrl, sharedSessionSchema);
     this.bundler = bundler;
-    this.encryptService = new EncryptionService();
     this.arbitrumSponsorshipPolicyId = arbitrumSponsorshipPolicyId;
   }
 

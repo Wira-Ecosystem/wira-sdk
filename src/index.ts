@@ -146,10 +146,27 @@ async function checkBiometricAuth() {
     return { ok: false, error: 'Biometric login failed' };
   }
   const creds = await Storage.getBiometricUserData();
-  if (!creds) {
+  if (!creds?.credentials) {
     return { ok: false, error: 'No credentials stored' };
   }
-  return { ok: true, userData: creds.credentials };
+
+  const fullCreds = JSON.parse(
+    await WiraSdk.getCredentials(
+      creds.credentials.did,
+      creds.credentials.privKey.replace('0x', '')
+    )
+  );
+  if (fullCreds?.credentials && fullCreds.credentials.length === 0) {
+    return { ok: false, error: 'No credentials found for the user' };
+  }
+
+  return {
+    ok: true,
+    userData: {
+      ...creds.credentials,
+      vc: fullCreds.credentials[0].info,
+    },
+  };
 }
 
 async function updatePin(registryUrl: string, oldPin: string, newPin: string) {

@@ -14,6 +14,9 @@ import WiraSdk from '../NativeWiraSdk';
 import { WiraSdkInterface } from '../encryption/nativeSdk';
 import type { UserData } from '../common/types';
 import { jsonStringifyWithBigInt } from '../vcCrypto/json';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+const registererDataKey = 'wira-sdk-';
 
 export type WalletData = {
   address: `0x${string}`;
@@ -57,12 +60,32 @@ export class Registerer {
     this.arbitrumSponsorshipPolicyId = arbitrumSponsorshipPolicyId;
   }
 
+  async clear() {
+    await Promise.all([
+      AsyncStorage.removeItem(registererDataKey + 'walletData'),
+      AsyncStorage.removeItem(registererDataKey + 'did'),
+      AsyncStorage.removeItem(registererDataKey + 'dni'),
+      AsyncStorage.removeItem(registererDataKey + 'guardianAddress'),
+    ]);
+  }
+
   async createVC(
     chain: keyof typeof availableNetworks,
     ocrData: any,
     credType: string,
     credExpirationDays: string
   ) {
+    this.chain = chain;
+    const jsonWalletData = await AsyncStorage.getItem(
+      registererDataKey + 'walletData'
+    );
+    this.walletData = jsonWalletData ? JSON.parse(jsonWalletData) : null;
+    this.subjectDid = await AsyncStorage.getItem(registererDataKey + 'did');
+
+    if (this.walletData && this.subjectDid) {
+      return;
+    }
+
     const { success, identity, error } = JSON.parse(
       await WiraSdk.addIdentity()
     );
@@ -75,30 +98,31 @@ export class Registerer {
       throw new Error('Error creating identity: did or privateKey missing');
     }
 
-    this.walletData = {
-      ...(await predictWalletAddress(chain, `0x${privateKey}`)),
-      privateKey: `0x${privateKey}`,
-    };
-    this.subjectDid = did;
-
     const claims = mapOcrToClaims(ocrData);
     const { id: credentialId } = await createCredential(
-      this.subjectDid,
+      did,
       privateKey,
       claims,
       credType,
       credExpirationDays
     );
 
-    const vc = await getCredential(credentialId, this.subjectDid, privateKey);
-    if (
-      vc?.credentialSubject?.id &&
-      vc.credentialSubject.id !== this.subjectDid
-    ) {
+    const vc = await getCredential(credentialId, did, privateKey);
+    if (vc?.credentialSubject?.id && vc.credentialSubject.id !== did) {
       throw new Error('El VC devuelto no corresponde al DID del usuario.');
     }
 
-    this.chain = chain;
+    this.walletData = {
+      ...(await predictWalletAddress(chain, `0x${privateKey}`)),
+      privateKey: `0x${privateKey}`,
+    };
+    this.subjectDid = did;
+    await AsyncStorage.setItem(
+      registererDataKey + 'walletData',
+      jsonStringifyWithBigInt(this.walletData)
+    );
+    await AsyncStorage.setItem(registererDataKey + 'did', did);
+
     return vc;
   }
 
@@ -108,7 +132,17 @@ export class Registerer {
         'Wallet data or chain is not initialized, did you call createVC?'
       );
     }
-    this.dni = dni;
+
+    this.dni = await AsyncStorage.getItem(registererDataKey + 'dni');
+    this.guardianAddress = (await AsyncStorage.getItem(
+      registererDataKey + 'guardianAddress'
+    )) as `0x${string}` | null;
+
+    if (this.dni && this.guardianAddress) {
+      return {
+        guardianAddress: this.guardianAddress,
+      };
+    }
 
     const response = await createWalletOnChain(
       this.chain,
@@ -120,7 +154,14 @@ export class Registerer {
       this.arbitrumSponsorshipPolicyId
     );
 
+    this.dni = dni;
     this.guardianAddress = response.guardianAddress;
+    await AsyncStorage.setItem(
+      registererDataKey + 'guardianAddress',
+      response.guardianAddress
+    );
+    await AsyncStorage.setItem(registererDataKey + 'dni', dni);
+
     return response;
   }
 
@@ -203,6 +244,8 @@ export class Registerer {
       this.pin,
       userDataWithIdentity
     );
+
+    await this.clear();
 
     return response;
   }

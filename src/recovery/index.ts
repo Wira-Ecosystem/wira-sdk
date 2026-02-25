@@ -233,7 +233,13 @@ export class RecoveryService {
       ...data,
       identity: backup,
     };
-    const fileName = `Backup_${Date.now()}.json`;
+    const now = new Date();
+    const formattedDate = now
+      .toISOString()
+      .replace(/T/, '_')
+      .replace(/:/g, '-')
+      .replace(/\..+/, '');
+    const fileName = `Respaldo_de_cuenta_${formattedDate}.json`;
     const jsonPayload = jsonStringifyWithBigInt(dataToBackup);
 
     if (Platform.OS === 'android') {

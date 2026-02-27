@@ -16,6 +16,7 @@ import { CircuitDownloadStatus } from './common/enums';
 import WiraSdk from './NativeWiraSdk';
 import type { UserData } from './common/types';
 import { WiraSdkInterface } from './encryption/nativeSdk';
+import { jsonStringifyWithBigInt } from './vcCrypto/json';
 
 type SignInOptions = {
   registryUrl: string;
@@ -175,14 +176,28 @@ async function updatePin(registryUrl: string, oldPin: string, newPin: string) {
     throw new Error('No user data found');
   }
   const decryptedData = await decryptVCWithPin(userData.credentials, oldPin);
+  const backup = await WiraSdkInterface.backupIdentity(
+    decryptedData.did,
+    decryptedData.privKey
+  );
+
+  const decryptedDataWithIdentity = {
+    ...decryptedData,
+    identity: backup,
+  };
+
   const encryptedWithNewPin = await encryptVCWithPin(decryptedData, newPin);
+  const encryptedWithIdentityWithNewPin = await encryptVCWithPin(
+    decryptedDataWithIdentity,
+    newPin
+  );
   await Storage.saveUserData(encryptedWithNewPin);
 
   const registryApi = new RegistryApi(registryUrl);
   const registerResponse = await registryApi.updateRecoveryData(
     decryptedData.dni,
-    encryptedWithNewPin,
-    decryptedData
+    encryptedWithIdentityWithNewPin,
+    jsonStringifyWithBigInt(decryptedDataWithIdentity)
   );
   if (!registerResponse.ok) {
     throw new Error('Failed to update data on server');

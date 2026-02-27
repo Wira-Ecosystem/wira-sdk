@@ -300,7 +300,6 @@ export class RecoveryService {
       discoverableHashFromDni(dni),
       deviceId
     );
-    console.log('Decryption attempt finished: ', data);
 
     if (!ok || !data.success) {
       throw new Error('Decryption failed');

@@ -103,7 +103,8 @@ async function checkPin(pin: string) {
 async function toggleBiometricAuth(userData: UserData, enabled: boolean) {
   try {
     if (enabled) {
-      const { available } = await Biometric.biometryAvailability();
+      const { available, biometryType } =
+        await Biometric.biometryAvailability();
       if (!available) {
         throw new Error('Biometric authentication is not available');
       }
@@ -111,6 +112,15 @@ async function toggleBiometricAuth(userData: UserData, enabled: boolean) {
         throw new Error(
           'User data is required to enable biometric authentication'
         );
+      }
+
+      const authenticated = await Biometric.biometricLogin(
+        biometryType === 'FaceID'
+          ? 'Escanea tu rostro para activar'
+          : 'Escanea tu huella para activar'
+      );
+      if (!authenticated) {
+        throw new Error('User cancelled biometric change');
       }
       await Storage.saveUserDataWithBiometric(userData);
       await Biometric.setBioFlag(true);

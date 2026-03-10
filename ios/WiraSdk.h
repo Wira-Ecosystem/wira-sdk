@@ -2,4 +2,6 @@
 
 @interface WiraSdk : NSObject <NativeWiraSdkSpec>
 
+- (void)ensureEngine;
+
 @end

@@ -15,6 +15,17 @@ RCT_EXPORT_MODULE()
 static FlutterEngine *sharedEngine = nil;
 static FlutterMethodChannel *sharedChannel = nil;
 
+static void RegisterFlutterPluginsIfAvailable(FlutterEngine *engine) {
+    Class registrantClass = NSClassFromString(@"GeneratedPluginRegistrant");
+    SEL registerSelector = @selector(registerWithRegistry:);
+
+    if (registrantClass && [registrantClass respondsToSelector:registerSelector]) {
+        ((void (*)(id, SEL, id))[registrantClass methodForSelector:registerSelector])(registrantClass, registerSelector, engine);
+    } else {
+        NSLog(@"[WiraSdk] GeneratedPluginRegistrant not found; Flutter plugins may be unavailable on wira_logic_engine");
+    }
+}
+
 + (BOOL)requiresMainQueueSetup { return NO; }
 
 - (void)ensureEngine {
@@ -22,6 +33,7 @@ static FlutterMethodChannel *sharedChannel = nil;
 
     sharedEngine = [[FlutterEngine alloc] initWithName:@"wira_logic_engine" project:nil];
     [sharedEngine runWithEntrypoint:@"main"];
+    RegisterFlutterPluginsIfAvailable(sharedEngine);
 
     sharedChannel = [FlutterMethodChannel
         methodChannelWithName:@"wira_logic"
@@ -68,8 +80,8 @@ static FlutterMethodChannel *sharedChannel = nil;
 }
 
 - (void)initialize:(NSString *)env
-          resolver:(RCTPromiseResolveBlock)resolve
-          rejecter:(RCTPromiseRejectBlock)reject
+           resolve:(RCTPromiseResolveBlock)resolve
+            reject:(RCTPromiseRejectBlock)reject
 {
     [self callFunction:@"initialize"
                   args:@{ @"env": env }
@@ -78,8 +90,8 @@ static FlutterMethodChannel *sharedChannel = nil;
 }
 
 - (void)downloadCircuits:(NSString *)circuitsToDownload
-                resolver:(RCTPromiseResolveBlock)resolve
-                rejecter:(RCTPromiseRejectBlock)reject
+                 resolve:(RCTPromiseResolveBlock)resolve
+                  reject:(RCTPromiseRejectBlock)reject
 {
     [self callFunction:@"downloadCircuits"
                   args:@{ @"circuitsToDownload": circuitsToDownload }
@@ -88,7 +100,7 @@ static FlutterMethodChannel *sharedChannel = nil;
 }
 
 - (void)addIdentity:(RCTPromiseResolveBlock)resolve
-           rejecter:(RCTPromiseRejectBlock)reject
+             reject:(RCTPromiseRejectBlock)reject
 {
     [self callFunction:@"addIdentity"
                   args:@{}
@@ -99,8 +111,8 @@ static FlutterMethodChannel *sharedChannel = nil;
 - (void)authenticate:(NSString *)message
              userDid:(NSString *)userDid
               userPk:(NSString *)userPk
-            resolver:(RCTPromiseResolveBlock)resolve
-            rejecter:(RCTPromiseRejectBlock)reject
+                         resolve:(RCTPromiseResolveBlock)resolve
+                            reject:(RCTPromiseRejectBlock)reject
 {
     NSDictionary *args = @{
         @"message": message,
@@ -113,8 +125,8 @@ static FlutterMethodChannel *sharedChannel = nil;
 - (void)claimCredential:(NSString *)offerMessage
                 userDid:(NSString *)userDid
                  userPk:(NSString *)userPk
-               resolver:(RCTPromiseResolveBlock)resolve
-               rejecter:(RCTPromiseRejectBlock)reject
+                                resolve:(RCTPromiseResolveBlock)resolve
+                                 reject:(RCTPromiseRejectBlock)reject
 {
     NSDictionary *args = @{
         @"offerMessage": offerMessage,
@@ -126,8 +138,8 @@ static FlutterMethodChannel *sharedChannel = nil;
 
 - (void)backupIdentity:(NSString *)userDid
                 userPk:(NSString *)userPk
-              resolver:(RCTPromiseResolveBlock)resolve
-              rejecter:(RCTPromiseRejectBlock)reject
+                             resolve:(RCTPromiseResolveBlock)resolve
+                                reject:(RCTPromiseRejectBlock)reject
 {
     NSDictionary *args = @{
         @"userDid": userDid,
@@ -139,8 +151,8 @@ static FlutterMethodChannel *sharedChannel = nil;
 - (void)restoreIdentity:(NSString *)backup
                 userDid:(NSString *)userDid
                  userPk:(NSString *)userPk
-               resolver:(RCTPromiseResolveBlock)resolve
-               rejecter:(RCTPromiseRejectBlock)reject
+                resolve:(RCTPromiseResolveBlock)resolve
+                 reject:(RCTPromiseRejectBlock)reject
 {
     NSDictionary *args = @{
         @"backup": backup,
@@ -152,14 +164,16 @@ static FlutterMethodChannel *sharedChannel = nil;
 
 - (void)getCredentials:(NSString *)userDid
                 userPk:(NSString *)userPk
-              resolver:(RCTPromiseResolveBlock)resolve
-              rejecter:(RCTPromiseRejectBlock)reject
+                             resolve:(RCTPromiseResolveBlock)resolve
+                                reject:(RCTPromiseRejectBlock)reject
 {
     NSDictionary *args = @{
         @"userDid": userDid,
         @"userPk": userPk
     };
     [self callFunction:@"getCredentials" args:args resolver:resolve rejecter:reject];
+}
+
 - (std::shared_ptr<facebook::react::TurboModule>)getTurboModule:
     (const facebook::react::ObjCTurboModule::InitParams &)params
 {

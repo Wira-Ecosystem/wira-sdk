@@ -17,7 +17,13 @@ import { Biometric } from '../biometry';
 import { SharedSession } from '../shared-session';
 import { WiraSdkInterface } from '../encryption/nativeSdk';
 import type { UserData, UserDataWithIdentity } from '../common/types';
-import { pick, types } from '@react-native-documents/picker';
+import {
+  errorCodes,
+  isErrorWithCode,
+  pick,
+  saveDocuments,
+  types,
+} from '@react-native-documents/picker';
 
 export class RecoveryService {
   async saveBackupData(
@@ -75,15 +81,15 @@ export class RecoveryService {
 
     const registryApi = new RegistryApi(registryUrl);
 
-    const { ok, data } = await registryApi.recoveryByCi(
+    const { ok, data, details } = await registryApi.recoveryByCi(
       discoverableHashFromDni(dni),
       frontBase,
       backBase,
       selfieBase
     );
 
-    if (!ok || !data.success) {
-      throw new Error('LIT Decryption failed: ' + data.details);
+    if (!ok || !data || !data.success) {
+      throw new Error('LIT Decryption failed: ' + (details ?? 'Unknown error'));
     }
 
     const response = JSON.parse(data.response as string);
@@ -249,15 +255,43 @@ export class RecoveryService {
       }
     }
 
+    const tempDir = RNFS.TemporaryDirectoryPath || RNFS.CachesDirectoryPath;
+    const tempPath = `${tempDir}/${fileName}`;
+
     try {
-      const downloadPath = `${RNFS.DownloadDirectoryPath}/${fileName}`;
-      await RNFS.writeFile(downloadPath, jsonPayload, 'utf8');
-      return { savedOn: 'downloads', path: downloadPath, fileName };
-    } catch (downloadError) {
-      // Último recurso: directorio interno
-      const internalPath = `${RNFS.DocumentDirectoryPath}/${fileName}`;
-      await RNFS.writeFile(internalPath, jsonPayload, 'utf8');
-      return { savedOn: 'internal', path: internalPath, fileName };
+      await RNFS.writeFile(tempPath, jsonPayload, 'utf8');
+      const sourceUri = encodeURI(
+        tempPath.startsWith('file://') ? tempPath : `file://${tempPath}`
+      );
+
+      const [savedFile] = await saveDocuments({
+        sourceUris: [sourceUri],
+        fileName,
+        mimeType: 'application/json',
+        copy: true,
+      });
+
+      if (!savedFile || savedFile.error) {
+        throw new Error(savedFile?.error || 'Unable to export backup file');
+      }
+
+      return { savedOn: 'exported', path: savedFile.uri, fileName };
+    } catch (error) {
+      if (
+        isErrorWithCode(error) &&
+        error.code === errorCodes.OPERATION_CANCELED
+      ) {
+        throw new Error('Export canceled');
+      }
+
+      throw error;
+    } finally {
+      try {
+        const exists = await RNFS.exists(tempPath);
+        if (exists) {
+          await RNFS.unlink(tempPath);
+        }
+      } catch {}
     }
   }
 

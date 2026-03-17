@@ -14,7 +14,7 @@ async function setBioFlag(enabled: boolean) {
 async function biometryAvailability() {
   try {
     const { available, biometryType } = await rnBio.isSensorAvailable();
-    return { available: !!available, biometryType: biometryType || null };
+    return { available, biometryType: biometryType || null };
   } catch {
     return { available: false, biometryType: null };
   }

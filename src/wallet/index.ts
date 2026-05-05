@@ -16,6 +16,7 @@ import {
 import { privateKeyToAccount } from 'viem/accounts';
 import {
   entryPoint07Address,
+  toCoinbaseSmartAccount,
   type SmartAccount,
 } from 'viem/account-abstraction';
 import { createPimlicoClient } from 'permissionless/clients/pimlico';
@@ -168,12 +169,10 @@ export async function createWalletOnChain(
       transport: http(),
     });
 
-    const account = await toSimpleSmartAccount({
+    const account = await toCoinbaseSmartAccount({
       client: publicClient,
-      factoryAddress: FACTORY_ADDRESS,
-      owner: privateKeyToAccount(privateKey),
-      entryPoint: { address: entryPoint07Address, version: '0.7' },
-      index: salt,
+      owners: [privateKeyToAccount(privateKey)],
+      version: '1',
     });
 
     const pimlicoClient = createPimlicoClient({

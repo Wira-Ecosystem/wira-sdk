@@ -89,7 +89,7 @@ export async function authenticate(userDid: string, userPk: string) {
   }
 
   const authResponse = JSON.parse(
-    await WiraSdk.authenticate(authData.message, userDid, userPk)
+    await WiraSdk.authenticate(authData.message, userDid, userPk, [])
   );
   if (!authResponse.success) {
     throw new Error(
@@ -116,11 +116,18 @@ export async function getCredential(
   }
 
   const claimResponse = JSON.parse(
-    await WiraSdk.claimCredential(offerData.universalLink, userDid, userPk)
+    await WiraSdk.claimCredential(
+      offerData.universalLink,
+      userDid,
+      userPk.replace('0x', '')
+    )
   );
   if (!claimResponse.success) {
     throw new Error(
-      'Claiming credential failed: ' + (claimResponse.error || 'unknown error')
+      'Claiming credential failed: ' +
+        (claimResponse.error || 'unknown error') +
+        ' Stacktrace: ' +
+        (claimResponse.stackTrace || 'no stacktrace')
     );
   }
 

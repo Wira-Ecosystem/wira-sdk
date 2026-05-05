@@ -17,6 +17,46 @@ import java.util.concurrent.CountDownLatch
 class WiraSdkModule(val reactContext: ReactApplicationContext) :
   NativeWiraSdkSpec(reactContext) {
 
+  private fun convertReadableValue(array: ReadableArray, index: Int): Any? {
+    return when (array.getType(index)) {
+      ReadableType.Null -> null
+      ReadableType.Boolean -> array.getBoolean(index)
+      ReadableType.Number -> array.getDouble(index)
+      ReadableType.String -> array.getString(index)
+      ReadableType.Map -> array.getMap(index)?.let { readableMapToMap(it) }
+      ReadableType.Array -> array.getArray(index)?.let { readableArrayToList(it) }
+    }
+  }
+
+  private fun convertReadableValue(map: ReadableMap, key: String): Any? {
+    return when (map.getType(key)) {
+      ReadableType.Null -> null
+      ReadableType.Boolean -> map.getBoolean(key)
+      ReadableType.Number -> map.getDouble(key)
+      ReadableType.String -> map.getString(key)
+      ReadableType.Map -> map.getMap(key)?.let { readableMapToMap(it) }
+      ReadableType.Array -> map.getArray(key)?.let { readableArrayToList(it) }
+    }
+  }
+
+  private fun readableArrayToList(array: ReadableArray): List<Any?> {
+    val result = mutableListOf<Any?>()
+    for (i in 0 until array.size()) {
+      result.add(convertReadableValue(array, i))
+    }
+    return result
+  }
+
+  private fun readableMapToMap(map: ReadableMap): Map<String, Any?> {
+    val result = mutableMapOf<String, Any?>()
+    val iterator = map.keySetIterator()
+    while (iterator.hasNextKey()) {
+      val key = iterator.nextKey()
+      result[key] = convertReadableValue(map, key)
+    }
+    return result
+  }
+
   override fun getName(): String = NAME
 
   fun callFunction(functionName: String, args: Map<String, Any>, promise: Promise) {
@@ -53,13 +93,26 @@ class WiraSdkModule(val reactContext: ReactApplicationContext) :
     callFunction("addIdentity", emptyMap(), promise)
   }
 
-  override fun authenticate(message: String, userDid: String, userPk: String, promise: Promise) {
+  override fun authenticate(message: String, userDid: String, userPk: String, requestedCredentialIds: ReadableArray, promise: Promise) {
     val args = mapOf(
       "message" to message,
       "userDid" to userDid,
-      "userPk" to userPk
+      "userPk" to userPk,
+      "requestedCredentialIds" to readableArrayToList(requestedCredentialIds)
     )
     callFunction("authenticate", args, promise)
+  }
+
+  override fun getProof(message: String, userDid: String, userPk: String, challenge: String, byField: String, byValue: String, promise: Promise) {
+    val args = mapOf(
+      "message" to message,
+      "userDid" to userDid,
+      "userPk" to userPk,
+      "challenge" to challenge,
+      "byField" to byField,
+      "byValue" to byValue
+    )
+    callFunction("getProof", args, promise)
   }
 
   override fun claimCredential(offerMessage: String, userDid: String, userPk: String, promise: Promise) {

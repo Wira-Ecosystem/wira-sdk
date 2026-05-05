@@ -186,6 +186,21 @@ export class Registerer {
 
     try {
       if (useBiometry) {
+        const { available, biometryType } =
+          await Biometric.biometryAvailability();
+        if (!available) {
+          throw new Error('Biometric authentication is not available');
+        }
+
+        const authenticated = await Biometric.biometricLogin(
+          biometryType === 'FaceID'
+            ? 'Escanea tu rostro para activar'
+            : 'Escanea tu huella para activar'
+        );
+        if (!authenticated) {
+          throw new Error('User cancelled biometric change');
+        }
+
         await Storage.saveUserDataWithBiometric(this.userData);
         await Biometric.setBioFlag(true);
       }
@@ -195,6 +210,9 @@ export class Registerer {
 
       await Storage.saveUserData(this.encryptedUserData);
     } catch (error) {
+      if (Biometric.isUserCancellation(error)) {
+        throw new Error('User cancelled biometric change');
+      }
       throw new Error('Error saving Wira data: ' + error);
     }
   }

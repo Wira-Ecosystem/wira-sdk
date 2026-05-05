@@ -98,6 +98,6 @@ dependencies {
   annotationProcessor 'com.google.dagger:dagger-compiler:2.57.1'
   ksp 'com.google.dagger:dagger-compiler:2.57.1'
 
-  debugImplementation 'com.example.wira_flutter_module:flutter_debug:1.0'
-  releaseImplementation 'com.example.wira_flutter_module:flutter_release:1.0'
+  debugImplementation 'com.wira.wira_flutter_module:flutter_debug:1.0'
+  releaseImplementation 'com.wira.wira_flutter_module:flutter_release:1.0'
 }

@@ -55,19 +55,39 @@ async function getBiometricUserData() {
  * @param userData - The user data to save (not encrypted).
  */
 async function saveUserDataWithBiometric(userData: UserData) {
-  await Keychain.setGenericPassword(
-    KEY_USERNAME,
-    jsonStringifyWithBigInt({ credentials: userData }),
-    {
-      service: BIO_SERVICE,
-      accessible: Keychain.ACCESSIBLE.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
-      accessControl:
-        Platform.OS === 'ios'
-          ? Keychain.ACCESS_CONTROL.BIOMETRY_CURRENT_SET
-          : Keychain.ACCESS_CONTROL.BIOMETRY_ANY,
+  const password = jsonStringifyWithBigInt({ credentials: userData });
+  const baseOptions = {
+    service: BIO_SERVICE,
+    accessible: Keychain.ACCESSIBLE.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
+    accessControl:
+      Platform.OS === 'ios'
+        ? Keychain.ACCESS_CONTROL.BIOMETRY_CURRENT_SET
+        : Keychain.ACCESS_CONTROL.BIOMETRY_ANY,
+  };
+
+  try {
+    await Keychain.setGenericPassword(KEY_USERNAME, password, {
+      ...baseOptions,
       securityLevel: Keychain.SECURITY_LEVEL.SECURE_HARDWARE,
+    });
+  } catch (error) {
+    const message = String(error);
+    const needsSecurityFallback =
+      Platform.OS === 'android' &&
+      (message.includes('CryptoFailedException') ||
+        message.includes(
+          'Cannot generate keys with required security guarantees'
+        ));
+
+    if (!needsSecurityFallback) {
+      throw error;
     }
-  );
+
+    await Keychain.setGenericPassword(KEY_USERNAME, password, {
+      ...baseOptions,
+      securityLevel: Keychain.SECURITY_LEVEL.SECURE_SOFTWARE,
+    });
+  }
 }
 
 /**

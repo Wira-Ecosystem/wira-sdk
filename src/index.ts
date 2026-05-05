@@ -17,6 +17,7 @@ import WiraSdk from './NativeWiraSdk';
 import type { UserData } from './common/types';
 import { WiraSdkInterface } from './encryption/nativeSdk';
 import { jsonStringifyWithBigInt } from './vcCrypto/json';
+import { getCredential } from './register/issuerClient';
 
 type SignInOptions = {
   registryUrl: string;
@@ -60,7 +61,9 @@ async function signIn(
       throw new Error('No credentials found for the user');
     }
 
-    data.vc = credentials.credentials[0].info;
+    data.vc = credentials.credentials.find(
+      (cred: any) => cred.type === 'PersonCredential'
+    )?.info;
 
     if (registerDevice) {
       const sharedSession = new SharedSession(
@@ -223,6 +226,9 @@ const wira = {
   checkPin,
   updatePin,
   authenticateWithVerifier: WiraSdkInterface.authenticate,
+  claimNewCredential: getCredential,
+  getUserCredentials: WiraSdkInterface.getCredentials,
+  getProof: WiraSdkInterface.getProof,
   provision,
   RegistryApi,
   GuardiansApi,

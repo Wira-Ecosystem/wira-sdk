@@ -20,7 +20,20 @@ export default defineConfig([
     plugins: { prettier },
     rules: {
       'react/react-in-jsx-scope': 'off',
-      'prettier/prettier': 'error',
+      'prettier/prettier': ["error", { "endOfLine": "auto" }],
+    },
+  },
+  {
+    files: [
+      '**/jest.setup.js',
+      '**/jest.config.js',
+      '**/*.test.{js,ts,tsx}',
+      '**/__tests__/**/*.{js,ts,tsx}',
+    ],
+    languageOptions: {
+      globals: {
+        jest: 'readonly',
+      },
     },
   },
   {

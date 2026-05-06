@@ -111,15 +111,37 @@ static void RegisterFlutterPluginsIfAvailable(FlutterEngine *engine) {
 - (void)authenticate:(NSString *)message
              userDid:(NSString *)userDid
               userPk:(NSString *)userPk
-                         resolve:(RCTPromiseResolveBlock)resolve
-                            reject:(RCTPromiseRejectBlock)reject
+requestedCredentialIds:(NSArray<NSString *> *)requestedCredentialIds
+             resolve:(RCTPromiseResolveBlock)resolve
+              reject:(RCTPromiseRejectBlock)reject
 {
     NSDictionary *args = @{
         @"message": message,
         @"userDid": userDid,
-        @"userPk": userPk
+        @"userPk": userPk,
+        @"requestedCredentialIds": requestedCredentialIds ?: @[]
     };
     [self callFunction:@"authenticate" args:args resolver:resolve rejecter:reject];
+}
+
+- (void)getProof:(NSString *)message
+         userDid:(NSString *)userDid
+          userPk:(NSString *)userPk
+       challenge:(NSString *)challenge
+         byField:(NSString *)byField
+         byValue:(NSString *)byValue
+         resolve:(RCTPromiseResolveBlock)resolve
+          reject:(RCTPromiseRejectBlock)reject
+{
+    NSDictionary *args = @{
+        @"message": message,
+        @"userDid": userDid,
+        @"userPk": userPk,
+        @"challenge": challenge,
+        @"byField": byField,
+        @"byValue": byValue
+    };
+    [self callFunction:@"getProof" args:args resolver:resolve rejecter:reject];
 }
 
 - (void)claimCredential:(NSString *)offerMessage

@@ -65,6 +65,13 @@ async function signIn(
       (cred: any) => cred.type === 'PersonCredential'
     )?.info;
 
+    if (!data.vc) {
+      throw new Error(
+        'PersonCredential not found for the user: only found ' +
+          credentials.credentials.map((c: any) => c.type).join(', ')
+      );
+    }
+
     if (registerDevice) {
       const sharedSession = new SharedSession(
         registerDevice.registryUrl,

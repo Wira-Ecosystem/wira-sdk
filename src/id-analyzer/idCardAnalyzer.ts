@@ -191,6 +191,7 @@ Si el orden SÍ es correcto, responde SOLO este JSON (sin texto extra):
 
   async analyzeFromRegistry(
     registryUrl: string,
+    registryApiKey: string,
     frontUri: string,
     backUri: string,
     selfieUri: string
@@ -205,7 +206,7 @@ Si el orden SÍ es correcto, responde SOLO este JSON (sin texto extra):
       this.fileToBase64(selfieUri),
     ]);
 
-    const registryApi = new RegistryApi(registryUrl);
+    const registryApi = new RegistryApi(registryUrl, registryApiKey);
     try {
       const result = await registryApi.analyzeFromRegistry(
         frontB64,

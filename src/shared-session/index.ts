@@ -14,8 +14,8 @@ export class SharedSession {
   api: AuthApi;
   sharedSessionSchema: string;
 
-  constructor(url: string, sharedSessionSchema: string) {
-    this.api = new AuthApi(url);
+  constructor(url: string, apiKey: string, sharedSessionSchema: string) {
+    this.api = new AuthApi(url, apiKey);
     this.sharedSessionSchema = sharedSessionSchema;
   }
 

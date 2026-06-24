@@ -22,6 +22,7 @@ import { MigrationService } from './register/migrate';
 
 type SignInOptions = {
   registryUrl: string;
+  registryApiKey: string;
   sharedSessionSchema: string;
 };
 
@@ -86,6 +87,7 @@ async function signIn(
     if (registerDevice) {
       const sharedSession = new SharedSession(
         registerDevice.registryUrl,
+        registerDevice.registryApiKey,
         registerDevice.sharedSessionSchema
       );
       await sharedSession.registerSharedSessionDevice(data.dni, pin, data);
@@ -204,10 +206,16 @@ async function checkBiometricAuth() {
 /**
  * Update the user's PIN by decrypting the stored credential with the old PIN, re-encrypting it with the new PIN, and updating the server with the new encrypted data.
  * @param registryUrl The URL of the registry server.
+ * @param registryApiKey The API key for the registry server.
  * @param oldPin The current PIN of the user.
  * @param newPin The new PIN to be set for the user.
  */
-async function updatePin(registryUrl: string, oldPin: string, newPin: string) {
+async function updatePin(
+  registryUrl: string,
+  registryApiKey: string,
+  oldPin: string,
+  newPin: string
+) {
   const userData = await Storage.getUserData();
   if (!userData) {
     throw new Error('No user data found');
@@ -231,7 +239,7 @@ async function updatePin(registryUrl: string, oldPin: string, newPin: string) {
 
   await Storage.saveUserData(encryptedWithNewPin);
 
-  const registryApi = new RegistryApi(registryUrl);
+  const registryApi = new RegistryApi(registryUrl, registryApiKey);
   const registerResponse = await registryApi.updateRecoveryData(
     decryptedData.dni,
     serverBackup

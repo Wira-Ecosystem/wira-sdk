@@ -46,17 +46,24 @@ export class Registerer {
   /**
    * Registerer constructor
    * @param registryUrl the URL of the backend-identity provided
+   * @param registryApiKey the API key for the registry
+   * @param sharedSessionSchema the schema for the shared session
    * @param bundler url of base paymaster url provided
    * @param arbitrumSponsorshipPolicyId optional sponsorship policy id for arbitrum networks
    */
   constructor(
     registryUrl: string,
+    registryApiKey: string,
     sharedSessionSchema: string,
     bundler: string,
     arbitrumSponsorshipPolicyId?: string
   ) {
-    this.registryApi = new RegistryApi(registryUrl);
-    this.sharedSession = new SharedSession(registryUrl, sharedSessionSchema);
+    this.registryApi = new RegistryApi(registryUrl, registryApiKey);
+    this.sharedSession = new SharedSession(
+      registryUrl,
+      registryApiKey,
+      sharedSessionSchema
+    );
     this.bundler = bundler;
     this.arbitrumSponsorshipPolicyId = arbitrumSponsorshipPolicyId;
   }

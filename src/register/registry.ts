@@ -14,10 +14,13 @@ export type RegistryInput = {
 export class RegistryApi {
   private API: AxiosInstance;
 
-  constructor(registryUrl: string) {
+  constructor(registryUrl: string, registryApiKey: string) {
     this.API = axios.create({
       baseURL: registryUrl,
       timeout: 50000,
+      headers: {
+        'x-api-key': registryApiKey,
+      },
     });
 
     this.API.interceptors.response.use(

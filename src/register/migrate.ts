@@ -9,8 +9,8 @@ import { MIGRATED_KEY } from '../common/constants';
 export class MigrationService {
   private api: RegistryApi;
 
-  constructor(registryUrl: string) {
-    this.api = new RegistryApi(registryUrl);
+  constructor(registryUrl: string, registryApiKey: string) {
+    this.api = new RegistryApi(registryUrl, registryApiKey);
   }
 
   async checkMigration(did: string) {

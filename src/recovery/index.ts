@@ -29,7 +29,8 @@ export class RecoveryService {
     data: UserDataWithIdentity,
     pin: string,
     sharedSessionSchema: string,
-    registryUrl: string
+    registryUrl: string,
+    registryApiKey: string
   ) {
     const { identity, ...rawData } = data;
 
@@ -39,8 +40,12 @@ export class RecoveryService {
       `${rawData.dni}:${pin}`
     );
 
-    const registryApi = new RegistryApi(registryUrl);
-    const sharedSession = new SharedSession(registryUrl, sharedSessionSchema);
+    const registryApi = new RegistryApi(registryUrl, registryApiKey);
+    const sharedSession = new SharedSession(
+      registryUrl,
+      registryApiKey,
+      sharedSessionSchema
+    );
 
     const registerResponse = await registryApi.updateRecoveryData(
       data.dni,
@@ -61,6 +66,7 @@ export class RecoveryService {
 
   async recoveryAndSave(
     registryUrl: string,
+    registryApiKey: string,
     frontImage: any,
     backImage: any,
     selfieImage: any,
@@ -72,7 +78,7 @@ export class RecoveryService {
     const backBase = await this.imageToBase64(backImage.uri);
     const selfieBase = await this.imageToBase64(selfieImage.uri);
 
-    const registryApi = new RegistryApi(registryUrl);
+    const registryApi = new RegistryApi(registryUrl, registryApiKey);
 
     const { ok, data, details } = await registryApi.recoveryByCi(
       discoverableHashFromDni(dni),
@@ -321,9 +327,13 @@ export class RecoveryService {
     return data;
   }
 
-  async recoveryFromGuardians(registryUrl: string, dni: string) {
+  async recoveryFromGuardians(
+    registryUrl: string,
+    registryApiKey: string,
+    dni: string
+  ) {
     const deviceId = await DeviceId.getDeviceId();
-    const registryApi = new RegistryApi(registryUrl);
+    const registryApi = new RegistryApi(registryUrl, registryApiKey);
 
     const { ok, data } = await registryApi.recoveryByGuardians(
       discoverableHashFromDni(dni),
@@ -346,9 +356,14 @@ export class RecoveryService {
     data: UserDataWithIdentity,
     pin: string,
     registryUrl: string,
+    registryApiKey: string,
     sharedSessionSchema: string
   ) {
-    const sharedSession = new SharedSession(registryUrl, sharedSessionSchema);
+    const sharedSession = new SharedSession(
+      registryUrl,
+      registryApiKey,
+      sharedSessionSchema
+    );
     const { identity, ...rawData } = data;
 
     await WiraSdkInterface.restoreIdentity(identity, data.did, data.privKey);

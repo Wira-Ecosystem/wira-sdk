@@ -33,12 +33,13 @@ export type TokenInput = {
 export class GuardiansApi {
   API: AxiosInstance;
 
-  constructor(guardiansUrl: string) {
+  constructor(guardiansUrl: string, guardiansApiKey: string) {
     this.API = axios.create({
       baseURL: guardiansUrl,
       timeout: 50000,
       headers: {
         'Content-Type': 'application/json',
+        'x-api-key': guardiansApiKey,
       },
     });
   }

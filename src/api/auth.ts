@@ -11,12 +11,13 @@ export type RegisterAppInput = {
 export class AuthApi {
   API: AxiosInstance;
 
-  constructor(guardiansUrl: string) {
+  constructor(guardiansUrl: string, guardiansApiKey: string) {
     this.API = axios.create({
       baseURL: guardiansUrl,
       timeout: 50000,
       headers: {
         'Content-Type': 'application/json',
+        'x-api-key': guardiansApiKey,
       },
     });
   }

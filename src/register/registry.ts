@@ -1,3 +1,4 @@
+import type { DniExtractedData } from '../common/types';
 import { discoverableHashFromDni } from './idHash';
 import axios, { type AxiosInstance } from 'axios';
 
@@ -8,7 +9,6 @@ export type RegistryInput = {
   displayNamePublic: boolean | null;
   dni: string;
   hashedDataWithIdentity: string; //for recovery purposes
-  userDataWithIdentity: string; //for recovery purposes
 };
 
 export class RegistryApi {
@@ -63,7 +63,6 @@ export class RegistryApi {
       discoverableHash: discoverableHashFromDni(input.dni),
       displayNamePublic: input.displayNamePublic ?? null,
       hashedDataWithIdentity: input.hashedDataWithIdentity,
-      userDataWithIdentity: input.userDataWithIdentity,
     };
     const { data } = await this.API.post('/registry/register', payload);
     // { ok:true, id: <streamId> }
@@ -78,15 +77,10 @@ export class RegistryApi {
     return data;
   }
 
-  async updateRecoveryData(
-    dni: string,
-    hashedDataWithIdentity: string,
-    userDataWithIdentity: string
-  ) {
+  async updateRecoveryData(dni: string, hashedDataWithIdentity: string) {
     const { data } = await this.API.patch('/registry/recovery', {
       discoverableHash: discoverableHashFromDni(dni),
       hashedDataWithIdentity,
-      userDataWithIdentity,
     });
     return data;
   }
@@ -110,6 +104,27 @@ export class RegistryApi {
     const { data } = await this.API.post('/registry/recovery-guardian', {
       discoverableHash: dniHash,
       deviceId,
+    });
+    return data;
+  }
+
+  async analyzeFromRegistry(front: string, back: string, selfie: string) {
+    const { data } = await this.API.post<{
+      ok: boolean;
+      error?: string;
+      details?: string;
+      data?: DniExtractedData;
+    }>('/registry/analyze', {
+      frontImg: front,
+      backImg: back,
+      selfieImg: selfie,
+    });
+    return data;
+  }
+
+  async canMigrate(did: string) {
+    const { data } = await this.API.get('/registry/can-migrate', {
+      params: { did },
     });
     return data;
   }

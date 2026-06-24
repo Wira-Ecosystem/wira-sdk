@@ -16,8 +16,9 @@ import { CircuitDownloadStatus } from './common/enums';
 import WiraSdk from './NativeWiraSdk';
 import type { UserData } from './common/types';
 import { WiraSdkInterface } from './encryption/nativeSdk';
-import { jsonStringifyWithBigInt } from './vcCrypto/json';
 import { getCredential } from './register/issuerClient';
+import { discoverableHashFromDni } from './register/idHash';
+import { MigrationService } from './register/migrate';
 
 type SignInOptions = {
   registryUrl: string;
@@ -29,29 +30,39 @@ type SignInOptions = {
  * @param pin - The user's PIN.
  * @param afterCiRecovery - Flag indicating if the sign-in is after a CI+PIN recovery.
  * @param registerDevice - Optional parameters for registering the device for shared sessions.
+ * @param dni - The user's DNI, required after recovery
  * @returns The decrypted user data.
  */
 async function signIn(
   pin: string,
   afterCiRecovery: boolean = false,
-  registerDevice?: SignInOptions
+  registerDevice?: SignInOptions,
+  dni?: string
 ) {
   try {
     const userData = await Storage.getUserData();
     if (!userData) {
       throw new Error('No user data found');
     }
-    const data = await decryptVCWithPin(userData.credentials, pin);
+
+    let data: any = null;
     if (afterCiRecovery) {
-      if (!data.identity) {
+      data = await decryptVCWithPin(
+        userData.credentials,
+        discoverableHashFromDni(`${dni}:${pin}`)
+      );
+
+      const { identity, ...rawData } = data;
+
+      if (!identity || !data.did || !data.privKey) {
         throw new Error('Identity information for recovery is missing');
       }
 
-      await WiraSdkInterface.restoreIdentity(
-        data.identity,
-        data.did,
-        data.privKey
-      );
+      await WiraSdkInterface.restoreIdentity(identity, data.did, data.privKey);
+      const restoredDataToSave = await encryptVCWithPin(rawData, pin);
+      await Storage.saveUserData(restoredDataToSave);
+    } else {
+      data = await decryptVCWithPin(userData.credentials, pin);
     }
 
     const credentials = JSON.parse(
@@ -190,6 +201,12 @@ async function checkBiometricAuth() {
   };
 }
 
+/**
+ * Update the user's PIN by decrypting the stored credential with the old PIN, re-encrypting it with the new PIN, and updating the server with the new encrypted data.
+ * @param registryUrl The URL of the registry server.
+ * @param oldPin The current PIN of the user.
+ * @param newPin The new PIN to be set for the user.
+ */
 async function updatePin(registryUrl: string, oldPin: string, newPin: string) {
   const userData = await Storage.getUserData();
   if (!userData) {
@@ -207,17 +224,17 @@ async function updatePin(registryUrl: string, oldPin: string, newPin: string) {
   };
 
   const encryptedWithNewPin = await encryptVCWithPin(decryptedData, newPin);
-  const encryptedWithIdentityWithNewPin = await encryptVCWithPin(
+  const serverBackup = await encryptVCWithPin(
     decryptedDataWithIdentity,
-    newPin
+    discoverableHashFromDni(`${decryptedData.dni}:${newPin}`)
   );
+
   await Storage.saveUserData(encryptedWithNewPin);
 
   const registryApi = new RegistryApi(registryUrl);
   const registerResponse = await registryApi.updateRecoveryData(
     decryptedData.dni,
-    encryptedWithIdentityWithNewPin,
-    jsonStringifyWithBigInt(decryptedDataWithIdentity)
+    serverBackup
   );
   if (!registerResponse.ok) {
     throw new Error('Failed to update data on server');
@@ -248,6 +265,7 @@ const wira = {
   SharedSession,
   Wallet,
   WalletCalls,
+  MigrationService,
 };
 export default wira;
 

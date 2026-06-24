@@ -71,7 +71,7 @@ String storageUrl = System.env.FLUTTER_STORAGE_BASE_URL ?: "https://storage.goog
 
 repositories {
   maven {
-    url "$rootDir/../../wira_flutter_module/build/host/outputs/repo"
+    url "$rootDir/../../wira-sdk-flutter-component/build/host/outputs/repo"
   }
   google()
   mavenCentral()

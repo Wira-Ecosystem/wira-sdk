@@ -1,4 +1,4 @@
-import { createWalletOnChain, predictWalletAddress } from '../wallet';
+import { predictWalletAddress } from '../wallet';
 import type { availableNetworks } from '../common/params';
 import {
   createCredential,
@@ -15,6 +15,7 @@ import { WiraSdkInterface } from '../encryption/nativeSdk';
 import type { UserData } from '../common/types';
 import { jsonStringifyWithBigInt } from '../vcCrypto/json';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { discoverableHashFromDni } from './idHash';
 
 const registererDataKey = 'wira-sdk-';
 
@@ -126,6 +127,7 @@ export class Registerer {
     return vc;
   }
 
+  /*
   async createWallet(dni: string) {
     if (!this.walletData || !this.chain) {
       throw new Error(
@@ -163,17 +165,18 @@ export class Registerer {
     await AsyncStorage.setItem(registererDataKey + 'dni', dni);
 
     return response;
-  }
+  }*/
 
-  async storeOnDevice(pin: string, useBiometry: boolean) {
-    if (!this.dni) {
-      throw new Error('DNI is not initialized, did you call createWallet?');
-    }
+  async storeOnDevice(dni: string, pin: string, useBiometry: boolean) {
     if (!this.walletData || !this.subjectDid) {
       throw new Error(
         'Wallet data or subjectDid is not initialized, did you call createVC?'
       );
     }
+    this.dni = dni;
+
+    // Deprecated, remove on next versions
+    this.guardianAddress = '0x';
 
     this.userData = {
       dni: this.dni,
@@ -223,10 +226,7 @@ export class Registerer {
         'Wallet data or subjectDid is not initialized, did you call createVC?'
       );
     }
-    if (!this.dni) {
-      throw new Error('DNI is not initialized, did you call createWallet?');
-    }
-    if (!this.userData || !this.encryptedUserData || !this.pin) {
+    if (!this.dni || !this.userData || !this.encryptedUserData || !this.pin) {
       throw new Error(
         'No credential to store on server, did you call storeOnDevice?'
       );
@@ -244,7 +244,7 @@ export class Registerer {
 
     const hashedDataWithIdentity = await encryptVCWithPin(
       userDataWithIdentity,
-      this.pin
+      discoverableHashFromDni(`${this.dni}:${this.pin}`)
     );
 
     const response = await this.registryApi.registryRegister({
@@ -254,7 +254,6 @@ export class Registerer {
       displayNamePublic: null,
       dni: this.dni,
       hashedDataWithIdentity,
-      userDataWithIdentity: jsonStringifyWithBigInt(userDataWithIdentity),
     });
 
     await this.sharedSession.registerSharedSessionDevice(

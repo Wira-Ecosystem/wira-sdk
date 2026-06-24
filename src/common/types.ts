@@ -53,3 +53,13 @@ export type UserData = {
 export type UserDataWithIdentity = UserData & {
   identity: string;
 };
+
+export type DniExtractedData = {
+  numeroDoc: string;
+  fullName: string;
+  fechaNacimiento: string;
+  fechaExpedicion: string;
+  lugarExpedicion: string;
+  faceMatch: boolean;
+  error?: string;
+};

@@ -173,8 +173,6 @@
     "@react-native-documents/picker": "^12.0.0",
     "@walletconnect/modal": "^2.7.0",
     "axios": "^1.12.2",
-    "i": "^0.3.7",
-    "npm": "^11.8.0",
     "permissionless": "^0.2.57",
     "react-native-biometrics": "^3.0.1",
     "react-native-fs": "^2.20.0",

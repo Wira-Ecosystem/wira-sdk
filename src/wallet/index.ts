@@ -133,12 +133,10 @@ export async function predictWalletAddress(
     transport: http(),
   });
 
-  const account = await toSimpleSmartAccount({
+  const account = await toCoinbaseSmartAccount({
     client,
-    factoryAddress: FACTORY_ADDRESS,
-    owner: privateKeyToAccount(privateKey),
-    entryPoint: { address: entryPoint07Address, version: '0.7' },
-    index: salt ?? newSalt,
+    owners: [privateKeyToAccount(privateKey)],
+    version: '1',
   });
 
   return { address: account.address, salt: newSalt };

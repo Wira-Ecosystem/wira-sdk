@@ -7,8 +7,7 @@ import {
 } from 'react-native-permissions';
 import { Alert } from 'react-native';
 import RNFS from 'react-native-fs';
-import { encryptVCWithPin } from '../vcCrypto';
-import { jsonStringifyWithBigInt } from '../vcCrypto/json';
+import { decryptVCWithPin, encryptVCWithPin } from '../vcCrypto';
 import { DeviceId } from '../deviceId';
 import { discoverableHashFromDni } from '../register/idHash';
 import { Storage } from '../storage';
@@ -16,7 +15,7 @@ import { RegistryApi } from '../register/registry';
 import { Biometric } from '../biometry';
 import { SharedSession } from '../shared-session';
 import { WiraSdkInterface } from '../encryption/nativeSdk';
-import type { UserData, UserDataWithIdentity } from '../common/types';
+import type { UserDataWithIdentity } from '../common/types';
 import {
   errorCodes,
   isErrorWithCode,
@@ -33,12 +32,11 @@ export class RecoveryService {
     registryUrl: string
   ) {
     const { identity, ...rawData } = data;
-    const rawDataWithIdentity = { ...rawData, identity };
 
     const hashedData = await encryptVCWithPin(rawData, pin);
     const hashedDataWithIdentity = await encryptVCWithPin(
-      rawDataWithIdentity,
-      pin
+      data,
+      `${rawData.dni}:${pin}`
     );
 
     const registryApi = new RegistryApi(registryUrl);
@@ -46,19 +44,14 @@ export class RecoveryService {
 
     const registerResponse = await registryApi.updateRecoveryData(
       data.dni,
-      hashedDataWithIdentity,
-      jsonStringifyWithBigInt(rawDataWithIdentity)
+      hashedDataWithIdentity
     );
 
     if (!registerResponse.ok) {
       throw new Error('Failed to update data on server');
     }
 
-    await sharedSession.registerSharedSessionDevice(
-      data.dni,
-      pin,
-      rawDataWithIdentity
-    );
+    await sharedSession.registerSharedSessionDevice(data.dni, pin, data);
 
     await WiraSdkInterface.restoreIdentity(identity, data.did, data.privKey);
     await Biometric.setBioFlag(false);
@@ -88,16 +81,11 @@ export class RecoveryService {
       selfieBase
     );
 
-    if (!ok || !data || !data.success) {
-      throw new Error('LIT Decryption failed: ' + (details ?? 'Unknown error'));
+    if (!ok || !data) {
+      throw new Error('Analisys failed: ' + (details ?? 'Unknown error'));
     }
 
-    const response = JSON.parse(data.response as string);
-    if (!response.success) {
-      throw new Error('Data recovery failed: ' + response.error);
-    }
-
-    await Storage.saveUserData(response.data);
+    await Storage.saveUserData(data);
   }
 
   async requestStoragePermission() {
@@ -229,7 +217,14 @@ export class RecoveryService {
     }
   }
 
-  async backupDataOnDevice(data: UserData) {
+  async backupDataOnDevice(pin: string) {
+    const userData = await Storage.getUserData();
+    if (!userData || !userData.credentials) {
+      throw new Error('No user data found');
+    }
+
+    const data = await decryptVCWithPin(userData.credentials, pin);
+
     const backup = await WiraSdkInterface.backupIdentity(
       data.did,
       data.privKey
@@ -246,7 +241,7 @@ export class RecoveryService {
       .replace(/:/g, '-')
       .replace(/\..+/, '');
     const fileName = `Respaldo_de_cuenta_${formattedDate}.json`;
-    const jsonPayload = jsonStringifyWithBigInt(dataToBackup);
+    const encryptedPayload = await encryptVCWithPin(dataToBackup, pin);
 
     if (Platform.OS === 'android') {
       const hasPermission = await this.requestStoragePermission();
@@ -259,7 +254,7 @@ export class RecoveryService {
     const tempPath = `${tempDir}/${fileName}`;
 
     try {
-      await RNFS.writeFile(tempPath, jsonPayload, 'utf8');
+      await RNFS.writeFile(tempPath, encryptedPayload, 'utf8');
       const sourceUri = encodeURI(
         tempPath.startsWith('file://') ? tempPath : `file://${tempPath}`
       );
@@ -295,7 +290,7 @@ export class RecoveryService {
     }
   }
 
-  async recoveryFromBackup() {
+  async recoveryFromBackup(pin: string) {
     if (Platform.OS === 'android') {
       const hasPermission = await this.requestStoragePermission();
       if (!hasPermission) {
@@ -315,7 +310,7 @@ export class RecoveryService {
     }
 
     const raw = await RNFS.readFile(pickedPath, 'utf8');
-    const data = JSON.parse(raw);
+    const data = await decryptVCWithPin(raw, pin);
 
     const required = ['dni', 'salt', 'privKey', 'account', 'did', 'identity'];
     const missing = required.filter((f) => !data[f]);

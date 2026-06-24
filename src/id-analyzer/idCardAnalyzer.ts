@@ -2,6 +2,8 @@
 import { GoogleGenAI } from '@google/genai';
 import RNFS from 'react-native-fs';
 import { getProvision } from '../common/provisionClient';
+import type { DniExtractedData } from '../common/types';
+import { RegistryApi } from '../register/registry';
 
 // Extrae texto a prueba de cambios del SDK
 async function extractText(resp: any): Promise<string> {
@@ -66,13 +68,21 @@ class IdCardAnalyzer {
   model: string;
 
   constructor() {
-    // this.genAI = new GoogleGenAI({ apiKey: API_GEMINI });
     this.genAI = null;
     this.model = 'gemini-2.5-flash';
   }
 
-  async ensureClient() {
+  async ensureClient(apiKey?: string) {
+    console.log('Initializing Google GenAI client for ID analysis');
     if (this.genAI) return this.genAI;
+    console.log('No existing GenAI client found, creating a new one...');
+
+    if (apiKey) {
+      console.log('Using provided API key for Google GenAI');
+      this.genAI = new GoogleGenAI({ apiKey });
+      return this.genAI;
+    }
+
     const prov = await getProvision();
     const key =
       prov?.gemini?.mode === 'apiKey' && prov?.gemini?.apiKey
@@ -123,8 +133,23 @@ Si el orden SÍ es correcto, responde SOLO este JSON (sin texto extra):
 `;
   }
 
-  async analyze(frontUri: string, backUri: string, selfieUri: string) {
-    const genAI = await this.ensureClient();
+  async analyze(
+    frontUri: string,
+    backUri: string,
+    selfieUri: string
+  ): Promise<{
+    success: boolean;
+    error?: string;
+    data?: DniExtractedData;
+    raw?: string;
+  }> {
+    if (!this.genAI) {
+      return {
+        success: false,
+        error: 'Client not initialized',
+      };
+    }
+
     const [frontB64, backB64, selfieB64] = await Promise.all([
       this.fileToBase64(frontUri),
       this.fileToBase64(backUri),
@@ -138,15 +163,14 @@ Si el orden SÍ es correcto, responde SOLO este JSON (sin texto extra):
       { inlineData: { mimeType: 'image/jpeg', data: selfieB64 } },
     ];
 
-    const resp = await genAI.models.generateContent({
+    const resp = await this.genAI.models.generateContent({
       model: this.model,
       contents,
     });
 
     const text = await extractText(resp);
 
-    let data;
-
+    let data: DniExtractedData;
     try {
       data = JSON.parse(text);
     } catch (e) {
@@ -162,31 +186,86 @@ Si el orden SÍ es correcto, responde SOLO este JSON (sin texto extra):
       }
     }
 
-    if (data?.error === 'front/back order') {
+    return this.processData(data);
+  }
+
+  async analyzeFromRegistry(
+    registryUrl: string,
+    frontUri: string,
+    backUri: string,
+    selfieUri: string
+  ): Promise<{
+    success: boolean;
+    error?: string;
+    data?: DniExtractedData;
+  }> {
+    const [frontB64, backB64, selfieB64] = await Promise.all([
+      this.fileToBase64(frontUri),
+      this.fileToBase64(backUri),
+      this.fileToBase64(selfieUri),
+    ]);
+
+    const registryApi = new RegistryApi(registryUrl);
+    try {
+      const result = await registryApi.analyzeFromRegistry(
+        frontB64,
+        backB64,
+        selfieB64
+      );
+
+      if (!result.ok) {
+        return {
+          success: false,
+          error: result.error + ': ' + result.details,
+        };
+      }
+
+      if (!result.data) {
+        return {
+          success: false,
+          error: 'Análisis exitoso pero sin datos extraídos',
+        };
+      }
+
+      return this.processData(result.data);
+    } catch (error) {
+      return {
+        success: false,
+        error: (error as Error).message,
+      };
+    }
+  }
+
+  processData(data: DniExtractedData): {
+    success: boolean;
+    error?: string;
+    data?: DniExtractedData;
+  } {
+    if (data.error === 'front/back order') {
       return { success: false, error: 'front/back order' };
     }
 
     const missing = [];
-    if (!data?.numeroDoc || !onlyDigits(data.numeroDoc))
+    if (!data.numeroDoc || !onlyDigits(data.numeroDoc))
       missing.push('numeroDoc');
-    if (!data?.fullName) missing.push('fullName');
-    if (!data?.fechaNacimiento || !isISODate(data.fechaNacimiento))
+    if (!data.fullName) missing.push('fullName');
+    if (!data.fechaNacimiento || !isISODate(data.fechaNacimiento))
       missing.push('fechaNacimiento');
-    if (!data?.fechaExpedicion || !isISODate(data.fechaExpedicion))
+    if (!data.fechaExpedicion || !isISODate(data.fechaExpedicion))
       missing.push('fechaExpedicion');
-    if (!data?.lugarExpedicion) missing.push('lugarExpedicion');
+    if (!data.lugarExpedicion) missing.push('lugarExpedicion');
 
     if (missing.length) {
       return {
         success: false,
-        error: `Campos faltantes ${missing.join(', ')}`,
+        error: `missing data ${missing.join(', ')}`,
         data,
       };
     }
     if (data.faceMatch === false) {
       return {
         success: false,
-        error: 'La verificación facial (faceMatch) ha fallado.',
+        error: 'face match failed',
         data,
       };
     }
@@ -197,12 +276,12 @@ Si el orden SÍ es correcto, responde SOLO este JSON (sin texto extra):
       if (!isFinite(dob) || !isFinite(exp) || exp <= dob) {
         return {
           success: false,
-          error: 'Fechas inconsistentes; revisa el orden de imágenes.',
+          error: 'inconsistent dates',
           data,
         };
       }
-    } catch (_) {
-      /* ignore */
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
     }
 
     return { success: true, data };

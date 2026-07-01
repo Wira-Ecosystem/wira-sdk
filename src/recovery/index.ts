@@ -37,7 +37,7 @@ export class RecoveryService {
     const hashedData = await encryptVCWithPin(rawData, pin);
     const hashedDataWithIdentity = await encryptVCWithPin(
       data,
-      `${rawData.dni}:${pin}`
+      discoverableHashFromDni(`${rawData.dni}:${pin}`)
     );
 
     const registryApi = new RegistryApi(registryUrl, registryApiKey);
@@ -67,24 +67,20 @@ export class RecoveryService {
   async recoveryAndSave(
     registryUrl: string,
     registryApiKey: string,
-    frontImage: any,
-    backImage: any,
-    selfieImage: any,
+    frontImageB64: string,
+    backImageB64: string,
+    selfieImageB64: string,
     dni: string
   ) {
     await Storage.deleteBiometricData();
-
-    const frontBase = await this.imageToBase64(frontImage.uri);
-    const backBase = await this.imageToBase64(backImage.uri);
-    const selfieBase = await this.imageToBase64(selfieImage.uri);
 
     const registryApi = new RegistryApi(registryUrl, registryApiKey);
 
     const { ok, data, details } = await registryApi.recoveryByCi(
       discoverableHashFromDni(dni),
-      frontBase,
-      backBase,
-      selfieBase
+      frontImageB64,
+      backImageB64,
+      selfieImageB64
     );
 
     if (!ok || !data) {

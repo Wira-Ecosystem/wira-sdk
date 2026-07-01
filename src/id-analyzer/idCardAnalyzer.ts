@@ -192,20 +192,14 @@ Si el orden SÍ es correcto, responde SOLO este JSON (sin texto extra):
   async analyzeFromRegistry(
     registryUrl: string,
     registryApiKey: string,
-    frontUri: string,
-    backUri: string,
-    selfieUri: string
+    frontB64: string,
+    backB64: string,
+    selfieB64: string
   ): Promise<{
     success: boolean;
     error?: string;
     data?: DniExtractedData;
   }> {
-    const [frontB64, backB64, selfieB64] = await Promise.all([
-      this.fileToBase64(frontUri),
-      this.fileToBase64(backUri),
-      this.fileToBase64(selfieUri),
-    ]);
-
     const registryApi = new RegistryApi(registryUrl, registryApiKey);
     try {
       const result = await registryApi.analyzeFromRegistry(

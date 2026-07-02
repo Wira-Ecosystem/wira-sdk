@@ -1,7 +1,11 @@
 package com.wirasdk
 
+import android.content.Context
+import android.net.wifi.WifiManager
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.os.PowerManager
 import com.facebook.react.bridge.*
 import com.facebook.react.modules.core.DeviceEventManagerModule.RCTDeviceEventEmitter
 import io.flutter.embedding.engine.FlutterEngine
@@ -11,6 +15,7 @@ import io.flutter.embedding.engine.loader.FlutterLoader
 import io.flutter.FlutterInjector
 import io.flutter.plugin.common.MethodChannel
 import com.facebook.react.module.annotations.ReactModule
+import org.json.JSONObject
 import java.util.concurrent.CountDownLatch
 
 @ReactModule(name = WiraSdkModule.NAME)
@@ -85,6 +90,7 @@ class WiraSdkModule(val reactContext: ReactApplicationContext) :
   }
 
   override fun downloadCircuits(circuitsToDownload: String, promise: Promise) {
+    acquireDownloadLocks(reactContext)
     val args = mapOf("circuitsToDownload" to circuitsToDownload)
     callFunction("downloadCircuits", args, promise)
   }
@@ -154,6 +160,38 @@ class WiraSdkModule(val reactContext: ReactApplicationContext) :
     private const val CHANNEL_NAME = "wira_logic"
     private var flutterEngine: FlutterEngine? = null
     private var methodChannel: MethodChannel? = null
+    private var wifiLock: WifiManager.WifiLock? = null
+    private var wakeLock: PowerManager.WakeLock? = null
+
+    private fun acquireDownloadLocks(context: ReactApplicationContext) {
+      try {
+        if (wifiLock?.isHeld != true) {
+          val wifiManager = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as? WifiManager
+          val lockType = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            WifiManager.WIFI_MODE_FULL_LOW_LATENCY
+          } else {
+            @Suppress("DEPRECATION")
+            WifiManager.WIFI_MODE_FULL_HIGH_PERF
+          }
+          wifiLock = wifiManager?.createWifiLock(lockType, "wira:circuit_download")
+          wifiLock?.setReferenceCounted(false)
+          wifiLock?.acquire()
+        }
+      } catch (_: Exception) {}
+      try {
+        if (wakeLock?.isHeld != true) {
+          val powerManager = context.applicationContext.getSystemService(Context.POWER_SERVICE) as? PowerManager
+          wakeLock = powerManager?.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "wira:circuit_download")
+          wakeLock?.setReferenceCounted(false)
+          wakeLock?.acquire(5 * 60 * 1000L) // 5-minute safety timeout
+        }
+      } catch (_: Exception) {}
+    }
+
+    private fun releaseDownloadLocks() {
+      try { if (wifiLock?.isHeld == true) wifiLock?.release() } catch (_: Exception) {}
+      try { if (wakeLock?.isHeld == true) wakeLock?.release() } catch (_: Exception) {}
+    }
 
     private fun ensureEngine(context: ReactApplicationContext) {
       if (flutterEngine != null) return
@@ -198,6 +236,12 @@ class WiraSdkModule(val reactContext: ReactApplicationContext) :
             val args = call.arguments as? String ?: ""
             val eventEmitter = context.getJSModule(RCTDeviceEventEmitter::class.java)
             eventEmitter.emit("downloadInfo", args)
+            try {
+              val status = JSONObject(args).optString("status")
+              if (status == "done" || status == "error") {
+                releaseDownloadLocks()
+              }
+            } catch (_: Exception) {}
             result.success(null)
           }
           else -> result.notImplemented()

@@ -3,6 +3,23 @@ import { BIO_SERVICE, KEY_SERVICE, KEY_USERNAME } from '../common/constants';
 import { jsonStringifyWithBigInt } from '../vcCrypto/json';
 import { Platform } from 'react-native';
 import type { UserData } from '../common/types';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+/**
+ *
+ */
+async function checkFirstLaunch() {
+  try {
+    const hasRunBefore = await AsyncStorage.getItem('hasRunBefore');
+    if (hasRunBefore === null) {
+      await deleteUserData();
+      await deleteBiometricData();
+      await AsyncStorage.setItem('hasRunBefore', 'true');
+    }
+  } catch (error) {
+    throw new Error(`Error checking first launch: ${error}`);
+  }
+}
 
 /**
  * Checks if user data is stored locally.
@@ -35,6 +52,13 @@ async function saveUserData(encryptedUserData: string) {
     jsonStringifyWithBigInt({ credentials: encryptedUserData }),
     { service: KEY_SERVICE }
   );
+}
+
+/**
+ * Deletes the user data from secure storage.
+ */
+async function deleteUserData() {
+  await Keychain.resetGenericPassword({ service: KEY_SERVICE });
 }
 
 /**
@@ -99,6 +123,7 @@ async function deleteBiometricData() {
 }
 
 export const Storage = {
+  checkFirstLaunch,
   checkUserData,
   getUserData,
   saveUserData,

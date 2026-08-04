@@ -10,7 +10,7 @@ import { Biometric } from './biometry';
 import { Storage } from './storage';
 import { SharedSession } from './shared-session';
 import { getWiraConfig, initDownloadCircuits, initWiraSdk } from './config';
-import { Wallet } from './wallet';
+import { predictWalletAddress, Wallet } from './wallet';
 import { WalletCalls } from './wallet/calls';
 import { CircuitDownloadStatus } from './common/enums';
 import WiraSdk from './NativeWiraSdk';
@@ -261,6 +261,7 @@ const wira = {
   claimNewCredential: getCredential,
   getUserCredentials: WiraSdkInterface.getCredentials,
   getProof: WiraSdkInterface.getProof,
+  predictWalletAddress,
   provision,
   RegistryApi,
   GuardiansApi,

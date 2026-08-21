@@ -2,6 +2,12 @@ import axios from 'axios';
 import { Buffer } from 'buffer';
 import { getProvision } from '../common/provisionClient';
 import WiraSdk from '../NativeWiraSdk';
+import { WiraSdkInterface } from '../encryption/nativeSdk';
+import { decryptVCWithPin, encryptVCWithPin } from '../vcCrypto';
+import { discoverableHashFromDni } from './idHash';
+import { RegistryApi } from './registry';
+import type { UserDataWithIdentity } from '../common/types';
+import { Storage } from '../storage';
 
 export type Claims = {
   fullName: string;
@@ -101,7 +107,12 @@ export async function authenticate(userDid: string, userPk: string) {
 export async function getCredential(
   credentialId: string,
   userDid: string,
-  userPk: string
+  userPk: string,
+  backupOptions?: {
+    pin: string;
+    registryUrl: string;
+    registryApiKey: string;
+  }
 ) {
   const api = await getIssuerApi();
   const issuerDid = await getIssuerDid();
@@ -134,6 +145,52 @@ export async function getCredential(
   const vc = claimResponse.credentials[0].info;
   if (!vc) {
     throw new Error('Claimed credential is missing info');
+  }
+
+  if (!backupOptions) {
+    return vc;
+  }
+
+  const backup = await WiraSdkInterface.backupIdentity(
+    userDid,
+    (userPk.startsWith('0x') ? userPk : '0x' + userPk) as `0x${string}`
+  );
+
+  const userData = await Storage.getUserData();
+  if (!userData) {
+    throw new Error('User data not found');
+  }
+  const decryptedData = await decryptVCWithPin(
+    userData.credentials,
+    backupOptions.pin
+  );
+
+  const newBackupData: UserDataWithIdentity = {
+    account: decryptedData.account,
+    did: decryptedData.did,
+    privKey: decryptedData.privKey,
+    dni: decryptedData.dni,
+    guardian: decryptedData.guardian,
+    salt: decryptedData.salt,
+    identity: backup,
+  };
+
+  const hashedDataWithIdentity = await encryptVCWithPin(
+    newBackupData,
+    discoverableHashFromDni(`${newBackupData.dni}:${backupOptions.pin}`)
+  );
+
+  const registryApi = new RegistryApi(
+    backupOptions.registryUrl,
+    backupOptions.registryApiKey
+  );
+  const registerResponse = await registryApi.updateRecoveryData(
+    newBackupData.dni,
+    hashedDataWithIdentity
+  );
+
+  if (!registerResponse.ok) {
+    throw new Error('Failed to save new vc on server');
   }
 
   return vc;

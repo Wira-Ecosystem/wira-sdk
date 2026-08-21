@@ -35,7 +35,7 @@ export class SharedSession {
   async registerSharedSessionDevice(dni: string, pin: string, data: any) {
     const discoverableHash = discoverableHashFromDni(dni);
     const key = `${await DeviceId.getDeviceId()}:${pin}`;
-    const sessionToken = await encryptVCWithPin(data, key);
+    const sessionToken = (await encryptVCWithPin(data, key)).slice(0, 100);
 
     const salt = randomBytes(16);
     const encryptedKey = await encryptKey(key, salt);

@@ -254,22 +254,34 @@ export class Registerer {
       discoverableHashFromDni(`${this.dni}:${this.pin}`)
     );
 
-    const response = await this.registryApi.registryRegister({
-      did: this.subjectDid,
-      accountAddress: this.userData.account,
-      guardianContractAddress: this.guardianAddress,
-      displayNamePublic: null,
-      dni: this.dni,
-      hashedDataWithIdentity,
-    });
+    let response;
+    try {
+      response = await this.registryApi.registryRegister({
+        did: this.subjectDid,
+        accountAddress: this.userData.account,
+        guardianContractAddress: this.guardianAddress,
+        displayNamePublic: null,
+        dni: this.dni,
+        hashedDataWithIdentity,
+      });
+    } catch (error: any) {
+      // Backend returns duplicated data on retry, not register again
+      if (
+        !error?.message?.includes(
+          'No se pudo registrar la identidad con los datos proporcionados'
+        )
+      ) {
+        throw error;
+      } else {
+        response = { ok: true, message: 'User already registered' };
+      }
+    }
 
     await this.sharedSession.registerSharedSessionDevice(
       this.dni,
       this.pin,
       userDataWithIdentity
     );
-
-    await this.clear();
 
     return response;
   }

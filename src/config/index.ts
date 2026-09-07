@@ -24,6 +24,30 @@ export async function initWiraSdk(cfg: WiraSdkConfig, env?: WiraSdkEnviroment) {
   }
 }
 
+export async function circuitsAreDownloaded(
+  circuitsToDownload?: CircuitsToDownloadParam
+): Promise<any> {
+  let response;
+  if (circuitsToDownload) {
+    response = JSON.parse(
+      await WiraSdk.circuitsAreDownloaded(JSON.stringify(circuitsToDownload))
+    );
+  } else {
+    response = JSON.parse(await WiraSdk.circuitsAreDownloaded(''));
+  }
+
+  if (!response.success) {
+    throw new Error(
+      'Failed to init download circuits: ' +
+        response.error +
+        ' Stacktrace: ' +
+        response.stackTrace
+    );
+  }
+
+  return response.areDownloaded;
+}
+
 export async function initDownloadCircuits(
   circuitsToDownload?: CircuitsToDownloadParam
 ): Promise<any> {

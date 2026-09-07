@@ -2,6 +2,7 @@ import { TurboModuleRegistry, type TurboModule } from 'react-native';
 
 export interface Spec extends TurboModule {
   initialize(env: string): Promise<any>;
+  circuitsAreDownloaded(circuitsToDownload: string): Promise<any>;
   downloadCircuits(circuitsToDownload: string): Promise<any>;
   addIdentity(): Promise<any>;
   authenticate(

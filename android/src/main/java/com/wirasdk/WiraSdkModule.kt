@@ -89,6 +89,12 @@ class WiraSdkModule(val reactContext: ReactApplicationContext) :
     callFunction("initialize", args, promise)
   }
 
+  override fun circuitsAreDownloaded(circuitsToDownload: String, promise: Promise) {
+    acquireDownloadLocks(reactContext)
+    val args = mapOf("circuitsToDownload" to circuitsToDownload)
+    callFunction("circuitsAreDownloaded", args, promise)
+  }
+
   override fun downloadCircuits(circuitsToDownload: String, promise: Promise) {
     acquireDownloadLocks(reactContext)
     val args = mapOf("circuitsToDownload" to circuitsToDownload)

@@ -9,7 +9,12 @@ import { DeviceId } from './deviceId';
 import { Biometric } from './biometry';
 import { Storage } from './storage';
 import { SharedSession } from './shared-session';
-import { getWiraConfig, initDownloadCircuits, initWiraSdk } from './config';
+import {
+  circuitsAreDownloaded,
+  getWiraConfig,
+  initDownloadCircuits,
+  initWiraSdk,
+} from './config';
 import { predictWalletAddress, Wallet } from './wallet';
 import { WalletCalls } from './wallet/calls';
 import { CircuitDownloadStatus } from './common/enums';
@@ -279,6 +284,7 @@ const wira = {
 export default wira;
 
 export const config = {
+  circuitsAreDownloaded,
   initDownloadCircuits,
   CircuitDownloadStatus,
 };

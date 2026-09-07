@@ -89,6 +89,16 @@ static void RegisterFlutterPluginsIfAvailable(FlutterEngine *engine) {
               rejecter:reject];
 }
 
+- (void)circuitsAreDownloaded:(NSString *)circuitsToDownload
+                 resolve:(RCTPromiseResolveBlock)resolve
+                  reject:(RCTPromiseRejectBlock)reject
+{
+    [self callFunction:@"circuitsAreDownloaded"
+                  args:@{ @"circuitsToDownload": circuitsToDownload }
+              resolver:resolve
+              rejecter:reject];
+}
+
 - (void)downloadCircuits:(NSString *)circuitsToDownload
                  resolve:(RCTPromiseResolveBlock)resolve
                   reject:(RCTPromiseRejectBlock)reject
